@@ -1,0 +1,378 @@
+#!/bin/bash
+
+# TODO - features to add
+# 1. let user filter by XML contents before downloading, eg cloud cover and missing %
+# 2. capture more nodata outputs - eg GDAL's nodata vs a layer's FILLNUM
+# 3. option to preview browse JPG before download
+# 4. if the output of masking according to user QC flag regex is all null then delete the acquisition date directory
+# 5. allow to filter by tiles with land or water or both
+# 6. have MODIS tiles from Neteler come prepackaged as SQLite db
+
+# NB
+# GDAL 1.10 might have to be used so that gdal_merge.py has the -a_nodata flag available
+
+usage()
+{
+cat << EOF
+
+* use shapefile and an ISO date range to download, clip, and mosaic MODIS (specifically MOLT for now) products
+* keeps only the HDF subsets that match your list (eg "ndvi quality")
+* keeps only pixels that match your QC regular expression
+* can reproject outputs
+* originally designed for MOD13A2 - beware if applying to other products!
+
+example use: 
+$0 -p MOD13A2.005 -x "ndvi quality" -d "2014-09-29 2014-10-30" -s 4326 -o ndvi/ -q "(0000|0001|0010|0100|1000)(01|00)$" -l "quality ndvi" -t input/modis_sinusoidal/modis_sinusoidal_grid_world.shp -b input/boundary/NOLA/NOLA_Boundary.shp
+$0 -p MOD14A1.005 -x "firemask qa" -d "2001-09-13 2001-09-16" -s 4326 -o fire/ -t input/modis_sinusoidal/modis_sinusoidal_grid_world.shp -b input/boundary/NOLA/NOLA_Boundary.shp
+
+OPTIONS:
+   -h      Show this message
+   -b      boundary shapefile this must be in the MODIS sinusoidal projection
+	   TODO: not providing this option still allows for a tile list to be chosen one per line in a file - ideal when whole tiles are desired
+   -t      tile template shapefile can be found at http://gis.cri.fmach.it/modis-sinusoidal-gis-files/
+   -d      double quoted date range, written as "YYYY-MM-DD YYYY-MM-DD".
+	   Note that dates refer to the acquisiton date of the image.
+	   TODO: not providing this option means the full date range will be taken
+   -p      MODIS product name with version number, eg MOD13A2.005
+   -x      subdataset extraction terms - these are double quoted words that will match the subdatasets of interest, like "ndvi quality"
+           Note: these will be searched for in gdalinfo output on the downloaded HDFs.  they will also be used in output file names
+           only one word per subset. (regex would be better)
+   -s	   output spatial reference system as EPSG code. 
+	   TODO: not providing this option means no reprojection will occur.
+   -q      QC flag regular expression. Should be quoted.
+	   Note: QC flags read from right to left.  also, this has only been tested on MOD13A2
+   -l      layers to use for QC filtering - first is the QC layer, second is the layer to filter
+	   Note: these must be the same terms used in the -x flag
+           TODO: ability to filter more than one layer
+   -o      output directory for mosaicked and clipped tifs - clips to boundary vector
+	   Note: the outpur directory will be made if necessary.  it ought to be empty
+EOF
+}
+
+while getopts "hb:t:p:d:s:o:x:q:l:" OPTION
+do
+     case $OPTION in
+         h)
+             usage
+             exit 1
+             ;;
+         b)
+             boundary=$OPTARG
+             ;;
+         t)
+             tiletemplate=$OPTARG
+             ;;
+         p)
+             product=$OPTARG
+             ;;
+         x)
+             subdataset_terms=$OPTARG
+             ;;
+         d)
+             daterange=$OPTARG
+             ;;
+         s)
+             srs=$OPTARG
+             ;;
+         l)
+             qc_layers=$OPTARG
+             ;;
+         q)
+             qc_regex=$OPTARG
+             ;;
+         o)
+             outdir=$OPTARG
+	     mkdir $outdir 2>/dev/null
+             ;;
+         ?)
+             usage
+             exit
+             ;;
+     esac
+done
+
+function numericdates {
+	# checks if YYYY-MM-DD USGS directories are within user specified date range
+	# used by download function to check relevant directories faster
+	# these are referred to as numeric because they are ISO dates without the hypens
+	numericrange=$( 
+		echo "$daterange" |\
+		sed 's:-::g' |\
+		tr ' ' '\n' |\
+		sort -n
+	)
+	numericstart=$(	
+		echo "$numericrange" |\
+		sed -n '1p'
+	)
+	numericend=$(
+		echo "$numericrange" |\
+		sed -n '2p'
+	)
+}
+
+function julianstartend {
+	# julian dates are used to ensure correct files are downloaded
+	# however, the USGS directory structure with ISO dates is relied on for speed
+	juliandays=$(
+		for date in $daterange
+		do
+			year=$(echo $date | grep -oE "^[0-9]{4}")
+			julianday=$( date -d "$date" +%j )
+			echo ${year}${julianday}
+		done |\
+		sort -n 
+	)
+	julianstartdate=$(
+		echo "$juliandays" |\
+		sed -n '1p'
+	)
+	julianenddate=$(
+		echo "$juliandays" |\
+		sed -n '2p'
+	)
+}
+
+function find_tiles {
+	# used by download function to determine which tiles are of interest
+	# load MODIS template and boundary shp into spatialite db
+	tmpsqlite=$(mktemp)
+	for shp in $boundary $tiletemplate
+	do
+		spatialite_tool -i -shp $( echo $shp | sed 's:[.]shp$::g' ) -t $( basename $shp .shp ) -d $tmpsqlite -g geom -c CP1252
+	done
+	# find the horizontal and vertical names of the MODIS tiles that intersect the boundary shp
+	tiles=$(
+		echo -e ".mode tabs\nselect t.h,t.v from $( basename $boundary .shp ) as b, $( basename $tiletemplate .shp ) as t where intersects(t.geom,b.geom);" |\
+		spatialite $tmpsqlite |\
+		# make sure that numbers are printed with leading zeroes as necessary
+		awk -F '\t' '{ OFS="\t"; h=sprintf("%02i", $1); v=sprintf("%02i", $2); print "h"h,"v"v }' |\
+		# get just unique list of tiles - multiple features may overlap same tiles
+		sort |\
+		uniq |\
+		# format the text for the MODIS archive, eg h10v06
+		sed 's:\t::g'
+	)
+}
+
+function download_list {
+	# get the start and end julian dates from the user
+	julianstartend
+	# get MODIS tiles that are intersected by the boundary shp
+	find_tiles
+	# format tile lists for regex by grep
+	tiles=$(
+		echo "$tiles" |\
+		# isolate tile position in parens
+		sed 's:^:(:g;s:$:):g' |\
+		# tack on requirement that the file be hdf or xml
+		sed 's:$:.*[.](hdf|xml)$:g'
+	)
+	# the base URL - this may change!
+	# note that $product is the name of the user selected product, eg MOD13A2.005
+	baseuri="http://e4ftl01.cr.usgs.gov/MODIS_Composites/MOLT/${product}/"
+	# on this first pass through the USGS archive, establish which directories, according to ISO date, are worth looking at given the user provided date range
+	# first make YYYYMMDD versions of our input user date range for awk
+	numericdates
+	isodirs=$(
+		lftp -e 'find -d2; exit' $baseuri |\
+		sed "s:^[.]\|/::g;s:[.]::g" |\
+		awk "{if(\$1 >= $numericstart && \$1 <= $numericend )print \$0}" |\
+		# return dates from numeric comparison style (YYYYMMDD) to USGS directory style (YYYY.MM.DD)
+		sed 's:^\([0-9]\{4\}\)\([0-9]\{2\}\)\([0-9]\{2\}\):\1.\2.\3:g' |\
+		# ensure these appear on a single line for the convenience of lftp find command
+		tr '\n' ' '
+	)
+	# on this second pass, target the ISO date directories of interest, find the relevant images by tile and official julian date
+	# this is very efficient for small date ranges but might be inefficient for large ones
+	lftp -e "find $isodirs; exit" $baseuri |\
+	# ensure that only images from the relevant tiles are downloaded
+	grep -Ef <( echo "$tiles" ) |\
+	# ensure that only images from the relevant dates are downloaded
+	# note that this is very sensitive to whether there is a leading period - this changes the column position of julian dates in file names
+	# note that the "A" from the aquisition julian date is first being removed then added again
+	awk -F'.' "{ OFS=\".\"; sub(/^A/,\"\", \$4); if( \$4 >= $julianstartdate && \$4 <= $julianenddate ) { sub(/^/,\"A\",\$4); print \$0 } }" |\
+	# add the baseuri to the front of th file names
+	# note that for the benefit of sed the baseuri has all forward slashes and semicolons escaped
+	sed "s:^:$( echo ${baseuri} | sed 's:\(/\|\:\):\\\1:g' ):g"
+}
+
+function download {
+	# get the date and tile filtered list of downloads
+	download_list |\
+	# download the images of interest
+	# what if the list is too long for xargs? GNU parallel?
+	xargs -I '{}' wget -P $outdir -c {}
+}
+
+function subdataset { 
+	# extracts subdatasets from HDF according to HDF name and term relevant to subdataset, eg quality or ndvi
+	# terms are not case sensitive - this makes file naming from terms nice but is very sensitive to GDAL utility outputs
+	# these are the files that get clipped, whose clipped parts are mosaicked according to date, and whose mosaics are QC masked
+	hdf=$1
+	term=$2
+	outdir=$3
+	subdataset_name=$( 
+		gdalinfo $hdf |\
+		grep -oiE "SUBDATASET_[0-9]+_NAME=.*[.]hdf.*$term" |\
+		grep -oE "[^=]*$" 
+	)
+	subfilename=$( 
+		basename $hdf .hdf |\
+		sed "s:^:${term}_:g;s:$:.tif:g" 
+	)
+	gdal_translate -of GTiff -co COMPRESS=DEFLATE "$subdataset_name" $outdir/$subfilename
+}
+# export function so GNU parallel can see it
+export -f subdataset
+
+function clip_mosaic_reproject { 
+	# for each acquisiton date, make a directory, extract the NDVI and quality subsets, clip each date's subsets to the intersection of its tile BBOX and the user shp, mosaic these
+	find $outdir -type f -iregex ".*[.]hdf$" |\
+	# find unique acquisition dates
+	grep -oE "[.]A[0-9]{7}" |\
+	sed "s:^[.]::g" |\
+	sort |\
+	uniq |\
+	# for user specified subset terms, like ndvi and quality, get subsets, clip each subset by each tile given the user specified boundary, and mosaic
+	# clipping each subset by each tile before mosaicking (instead of mosaicking all and clipping by boundary after) takes more steps but is more memory efficient (unless whole tiles are desired - ought to create an alternative using a text file of tile lists)
+	# respects input nodata of the subset
+	parallel --gnu '
+		# remove if necessary and recreate acquisiton date dir
+		rm -r '$outdir'/{} 2>/dev/null
+		mkdir '$outdir'/{} 2>/dev/null
+		for term in '$subdataset_terms'
+		do
+			# find HDF that match the acquisition date dir
+			find '$outdir' -type f -iregex ".*[.]{}[.].*[.]hdf$" |\
+			# extract the subsets for that date and term and move them to the date dir
+			while read hdf
+			do
+				subdataset $hdf $term '$outdir'/{}
+			done
+			# establish nodata value for this subset
+			# will be used by subsequent GDAL utils
+			example_file=$( 
+				find '$outdir'/{} -type f -iregex ".*/${term}.*[.]tif$" |\
+				sed -n "1p" 
+			) 
+			# TODO: this works for GDAL responses including "NoData Value" and "NUMFILL" - but what about others?
+			nodata=$(
+				# it is assumed that a subset has a single nodata value
+				gdalinfo $example_file |\
+				grep -iE "NoData Value=|NUMFILL=" |\
+				grep -oE "[0-9.-]+" |\
+				sed -n "1p"
+			)
+			# assume that if no nodata is found then there is no nodata
+			# this may often be false!
+			if [[ -n $nodata ]]; then
+				# if a nodata value is found then GDAL utils will use it
+				srcdst_nodata="-srcnodata $nodata -dstnodata $nodata"
+				merge_nodata="-n $nodata -a_nodata $nodata"
+			else
+				# if there is no nodata found then GDAL utils will ignore it
+				srcdst_nodata=""
+				merge_nodata=""
+			fi
+			find '$outdir'/{} -type f -iregex ".*/${term}.*[.]tif$" |\
+			# for each extracted subset of the date and term, crop to user boundary
+			while read to_crop
+			do
+				# cutline on user boundary
+				gdalwarp $srcdst_nodata -r near -cutline '$boundary' -crop_to_cutline -of GTiff -co COMPRESS=DEFLATE $to_crop $(echo $to_crop | sed "s:\(${term}_\):crop_\1:g")
+			done
+			# mosaic the output crops
+			gdal_merge.py $merge_nodata -of GTiff -co COMPRESS=DEFLATE -o '$outdir'/{}/mosaic_crop_${term}_'$product'.{}.tif '$outdir'/{}/crop_${term}*
+			# reproject if user raised flag
+			# as ridiculous as this seems, it is needed in case the -s flag is not raised. that, or flip the if condition
+			srs='$srs'
+			if [[ -n $srs ]]; then
+				gdalwarp -t_srs EPSG:'$srs' $srcdst_nodata -r near '$outdir'/{}/mosaic_crop_${term}_'$product'.{}.tif '$outdir'/{}/mosaic_crop_${term}_'$product'.{}.tif.reproject
+				# overwrite - keep that old filename
+				mv '$outdir'/{}/mosaic_crop_${term}_'$product'.{}.tif.reproject '$outdir'/{}/mosaic_crop_${term}_'$product'.{}.tif
+			fi
+			# remove tmp files
+			rm '$outdir'/{}/crop*
+			rm '$outdir'/{}/${term}*
+			# better file names
+			rename "s:/mosaic_crop_:/:g" '$outdir'/{}/*
+		done
+	'
+}
+
+function filter_QC {
+	# 1. use GDAL to make ASCII grid to find unique non-null values in the quality layer
+	# 2. convert these to binary
+	# 3. check which are acceptable according to user QC regex
+	# 4. mask these pixels out in second layer of interest using gdal_calc 
+	# it is possible that just having a completed look up table is a better approach but this lets the user provide an arbitrary regex for any MODIS product
+
+	qc_layer=$1
+	data_layer=$2
+	
+	# get the clipped, mosaicked subsets as ASCII grid
+	find $outdir -type f -iregex ".*A[0-9]+.*$qc_layer*[.]tif$" |\
+	# note that it might be inefficient to check QC flags by date when they could all be checked at once
+	# however, on larger datasets it might also break sort, uniq, etc to ask them to process all the ASCII grids at once
+	parallel --gnu '
+		tmpgrid=$(mktemp)
+		gdal_translate -of AAIGrid {} $tmpgrid
+		# find quality nodata value
+		nodata=$(
+			grep NODATA_value $tmpgrid |\
+			awk "{ print \$2 }"
+		)
+		# create a tmp file to hold blacklisted pixel values
+		tmpblacklist=$(mktemp)
+		cat $tmpgrid |\
+		# ignore header
+		sed "1,6d" |\
+		tr " " "\n" |\
+		grep -vE "^$" |\
+		# get unique pixel values
+		sort |\
+		uniq |\
+		# ignore nodata
+		grep -vE "$nodata" |\
+		# for each unique non-null pixel value, get the QC 16bits
+		while read bitpacked
+		do 
+			# pass the int to bc to get binary
+			echo "obase=2; $bitpacked" |\
+			bc |\
+			# now we need to pad with leading zeroes
+			# I have no idea why but the following does work for 16bit
+			# printf was not a solution!
+			# credit goes to Jonathan Leffler
+			# http://stackoverflow.com/questions/12633522/prevent-bc-from-auto-truncating-leading-zeros-when-converting-from-hex-to-binary
+			# pad binary with leading zeroes as needed to show 16 bits
+			awk "{ len = (8 - length % 8) % 8; printf \"%.*s%s\n\", len, \"00000000\", \$0}" |\
+			# show the bitpacked int as well for lookup later
+			sed "s:^:$bitpacked\t:g"
+		done |\
+		# use the user provided regex to find acceptable bitpacked int values in the QC maps
+		# note that QC field reads from right to left
+		# store them in a tmp blacklist
+		awk "{if(\$2 !~ /'$qc_regex'/)print \$1}" |\
+		tr "\n" "|" |\
+		sed "s:|$::g;s:|:\\\|:g" \
+		> $tmpblacklist
+		# convert this blacklist into nodata value in the ASCII grid
+		# TODO: temporarily ignore and then reattach header in case bad quality bitpacked ints appear in ASCII header
+		# just in case all pixels are acceptable, do not try to change anything!
+		if [[ $( cat $tmpblacklist | grep -vE "^$" | wc -l ) != 0 ]]; then
+			sed -i "s:\b\($( cat $tmpblacklist )\)\b:$nodata:g" $tmpgrid
+		fi
+		# for pixels where the masked grid is null, make your other layer null
+		# use of ls to pick up name of layer to mask is sloppy
+		tomask=$( ls $( dirname {} )/'${data_layer}'*.tif )
+		gdal_calc.py -A $tmpgrid -B $tomask --calc="B+1*(A==$nodata)" --outfile=$( dirname {} )/masked_$( basename ${tomask} )
+		# replace the old unmasked layer with the masked one
+		mv $( dirname {} )/masked_$( basename ${tomask} ) $( dirname {} )/$( basename ${tomask} )
+	'
+}
+
+download
+clip_mosaic_reproject
+filter_QC $qc_layers
