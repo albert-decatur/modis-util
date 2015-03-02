@@ -11,23 +11,21 @@
 
 ### Example modis-util output
 
-* outputs are . . .
-
   * in directories that are organized by MODIS acquisition date
-  * subsets of choice, in this case the NDVI and quality layers from MOD13A2 1km 16 day composites
-  * clipped to user shapefile boundary - in this case New Orleans city boundary
+  * subsets of choice, in the output/ example case they are NDVI and quality layers from MOD13A2 1km 16 day composites
+  * clipped to user shapefile boundary - in the output/ example case New Orleans city boundary
   * mosaicked 
   * QC filtered according to user regular expression
-    * in this case "(0000|0001|0010|0100|1000)(01|00)$"
-  * reprojected to WGS84
-  * only for the date range provided by the user, in this case the entire MODIS archive
+    * in the output/ example case "(0000|0001|0010|0100|1000)(01|00)$"
+  * reprojected, in the output/ example case to WGS84 
+  * only for the date range provided by the user, in the output/ example case the entire MODIS archive
 
-Execution time on a 1 CPU 2GB RAM machine:
+Example execution time on a 1 CPU 2GB RAM machine (seriously minimal hardware!):
 
   * 100 minutes for download
   * 30 minutes for processing
 
-File size:
+Example file size:
 
   * input: >8GB
   * output: <1MB
