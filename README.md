@@ -24,8 +24,3 @@ Example execution time on a 1 CPU 2GB RAM machine (seriously minimal hardware!):
 
   * 100 minutes for download
   * 30 minutes for processing
-
-Example file size:
-
-  * input: >8GB
-  * output: <1MB
