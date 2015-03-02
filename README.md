@@ -1,6 +1,6 @@
 # modis-util
 
-### what it does
+### What it does
 
 * downloads MODIS products according to user shapefile boundary
 * for user defined ISO date range
