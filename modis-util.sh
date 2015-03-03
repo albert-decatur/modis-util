@@ -7,6 +7,8 @@
 # 4. if the output of masking according to user QC flag regex is all null then delete the acquisition date directory
 # 5. allow to filter by tiles with land or water or both
 # 6. have MODIS tiles from Neteler come prepackaged as SQLite db
+# 7. bring back XML downloads
+# 8. store URLs of downloads
 
 # NB
 # GDAL 1.10 might have to be used so that gdal_merge.py has the -a_nodata flag available
@@ -83,6 +85,8 @@ do
          o)
              outdir=$OPTARG
 	     mkdir $outdir 2>/dev/null
+	     #tmpdir to be moved to outdir at end
+	     tmpdir=$(mktemp -d)
              ;;
          ?)
              usage
@@ -90,6 +94,9 @@ do
              ;;
      esac
 done
+
+# TODO undo!
+tmpdir=/tmp/tmp.wCqHc7gqqW
 
 function numericdates {
 	# checks if YYYY-MM-DD USGS directories are within user specified date range
@@ -165,8 +172,8 @@ function download_list {
 		echo "$tiles" |\
 		# isolate tile position in parens
 		sed 's:^:(:g;s:$:):g' |\
-		# tack on requirement that the file be hdf or xml
-		sed 's:$:.*[.](hdf|xml)$:g'
+		# tack on requirement that the file be hdf
+		sed 's:$:.*[.]hdf$:g'
 	)
 	# the base URL - this may change!
 	# note that $product is the name of the user selected product, eg MOD13A2.005
@@ -198,12 +205,11 @@ function download_list {
 }
 
 function download {
-	# get the date and tile filtered list of downloads
-	download_list |\
 	# download the images of interest
 	# what if the list is too long for xargs? GNU parallel?
-	xargs -I '{}' wget -P $outdir -c {}
+	wget -q -P $2 -c $1
 }
+export -f download
 
 function subdataset { 
 	# extracts subdatasets from HDF according to HDF name and term relevant to subdataset, eg quality or ndvi
@@ -211,7 +217,7 @@ function subdataset {
 	# these are the files that get clipped, whose clipped parts are mosaicked according to date, and whose mosaics are QC masked
 	hdf=$1
 	term=$2
-	outdir=$3
+	suboutdir=$3
 	subdataset_name=$( 
 		gdalinfo $hdf |\
 		grep -oiE "SUBDATASET_[0-9]+_NAME=.*[.]hdf.*$term" |\
@@ -221,85 +227,80 @@ function subdataset {
 		basename $hdf .hdf |\
 		sed "s:^:${term}_:g;s:$:.tif:g" 
 	)
-	gdal_translate -of GTiff -co COMPRESS=DEFLATE "$subdataset_name" $outdir/$subfilename
+	gdal_translate -of GTiff -co COMPRESS=DEFLATE "$subdataset_name" $suboutdir/$subfilename
 }
 # export function so GNU parallel can see it
 export -f subdataset
 
 function clip_mosaic_reproject { 
-	# for each acquisiton date, make a directory, extract the NDVI and quality subsets, clip each date's subsets to the intersection of its tile BBOX and the user shp, mosaic these
-	find $outdir -type f -iregex ".*[.]hdf$" |\
-	# find unique acquisition dates
-	grep -oE "[.]A[0-9]{7}" |\
-	sed "s:^[.]::g" |\
-	sort |\
-	uniq |\
 	# for user specified subset terms, like ndvi and quality, get subsets, clip each subset by each tile given the user specified boundary, and mosaic
 	# clipping each subset by each tile before mosaicking (instead of mosaicking all and clipping by boundary after) takes more steps but is more memory efficient (unless whole tiles are desired - ought to create an alternative using a text file of tile lists)
 	# respects input nodata of the subset
-	parallel --gnu '
-		# remove if necessary and recreate acquisiton date dir
-		rm -r '$outdir'/{} 2>/dev/null
-		mkdir '$outdir'/{} 2>/dev/null
-		for term in '$subdataset_terms'
+	acquisition_date=$1
+	###################
+###########################
+#########################
+#########################
+#### how to get getopts flags recognized inside functions inside gnu parallel
+	for term in $subdataset_terms
+	do
+		# find HDF that match the acquisition date dir
+		find $tmpdir -type f -iregex ".*[.]$acquisition_date[.].*[.]hdf$" |\
+		# extract the subsets for that date and term and move them to the date dir
+		while read hdf
 		do
-			# find HDF that match the acquisition date dir
-			find '$outdir' -type f -iregex ".*[.]{}[.].*[.]hdf$" |\
-			# extract the subsets for that date and term and move them to the date dir
-			while read hdf
-			do
-				subdataset $hdf $term '$outdir'/{}
-			done
-			# establish nodata value for this subset
-			# will be used by subsequent GDAL utils
-			example_file=$( 
-				find '$outdir'/{} -type f -iregex ".*/${term}.*[.]tif$" |\
-				sed -n "1p" 
-			) 
-			# TODO: this works for GDAL responses including "NoData Value" and "NUMFILL" - but what about others?
-			nodata=$(
-				# it is assumed that a subset has a single nodata value
-				gdalinfo $example_file |\
-				grep -iE "NoData Value=|NUMFILL=" |\
-				grep -oE "[0-9.-]+" |\
-				sed -n "1p"
-			)
-			# assume that if no nodata is found then there is no nodata
-			# this may often be false!
-			if [[ -n $nodata ]]; then
-				# if a nodata value is found then GDAL utils will use it
-				srcdst_nodata="-srcnodata $nodata -dstnodata $nodata"
-				merge_nodata="-n $nodata -a_nodata $nodata"
-			else
-				# if there is no nodata found then GDAL utils will ignore it
-				srcdst_nodata=""
-				merge_nodata=""
-			fi
-			find '$outdir'/{} -type f -iregex ".*/${term}.*[.]tif$" |\
-			# for each extracted subset of the date and term, crop to user boundary
-			while read to_crop
-			do
-				# cutline on user boundary
-				gdalwarp $srcdst_nodata -r near -cutline '$boundary' -crop_to_cutline -of GTiff -co COMPRESS=DEFLATE $to_crop $(echo $to_crop | sed "s:\(${term}_\):crop_\1:g")
-			done
-			# mosaic the output crops
-			gdal_merge.py $merge_nodata -of GTiff -co COMPRESS=DEFLATE -o '$outdir'/{}/mosaic_crop_${term}_'$product'.{}.tif '$outdir'/{}/crop_${term}*
-			# reproject if user raised flag
-			# as ridiculous as this seems, it is needed in case the -s flag is not raised. that, or flip the if condition
-			srs='$srs'
-			if [[ -n $srs ]]; then
-				gdalwarp -t_srs EPSG:'$srs' $srcdst_nodata -r near '$outdir'/{}/mosaic_crop_${term}_'$product'.{}.tif '$outdir'/{}/mosaic_crop_${term}_'$product'.{}.tif.reproject
-				# overwrite - keep that old filename
-				mv '$outdir'/{}/mosaic_crop_${term}_'$product'.{}.tif.reproject '$outdir'/{}/mosaic_crop_${term}_'$product'.{}.tif
-			fi
-			# remove tmp files
-			rm '$outdir'/{}/crop*
-			rm '$outdir'/{}/${term}*
-			# better file names
-			rename "s:/mosaic_crop_:/:g" '$outdir'/{}/*
+			subdataset $hdf $term $tmpdir/$acquisition_date
 		done
-	'
+		# establish nodata value for this subset
+		# will be used by subsequent GDAL utils
+		example_file=$( 
+			find $tmpdir/$acquisition_date -type f -iregex ".*/${term}.*[.]tif$" |\
+			sed -n "1p" 
+		) 
+		# TODO: this works for GDAL responses including "NoData Value" and "NUMFILL" - but what about others?
+		nodata=$(
+			# it is assumed that a subset has a single nodata value
+			gdalinfo $example_file |\
+			grep -iE "NoData Value=|NUMFILL=" |\
+			grep -oE "[0-9.-]+" |\
+			sed -n "1p"
+		)
+		# assume that if no nodata is found then there is no nodata
+		# this may often be false!
+		if [[ -n $nodata ]]; then
+			# if a nodata value is found then GDAL utils will use it
+			srcdst_nodata="-srcnodata $nodata -dstnodata $nodata"
+			merge_nodata="-n $nodata -a_nodata $nodata"
+		else
+			# if there is no nodata found then GDAL utils will ignore it
+			srcdst_nodata=""
+			merge_nodata=""
+		fi
+		find $tmpdir/$acquisition_date -type f -iregex ".*/${term}.*[.]tif$" |\
+		# for each extracted subset of the date and term, crop to user boundary
+		while read to_crop
+		do
+			# cutline on user boundary
+			gdalwarp $srcdst_nodata -r near -cutline $boundary -crop_to_cutline -of GTiff -co COMPRESS=DEFLATE $to_crop $(echo $to_crop | sed "s:\(${term}_\):crop_\1:g")
+		done
+		# mosaic the output crops
+		gdal_merge.py $merge_nodata -of GTiff -co COMPRESS=DEFLATE -o $tmpdir/$acquisition_date/mosaic_crop_${term}_$product.$acquisition_date.tif $tmpdir/$acquisition_date/crop_${term}*
+		# reproject if user raised flag
+		# as ridiculous as this seems, it is needed in case the -s flag is not raised. that, or flip the if condition
+		srs=$srs
+		if [[ -n $srs ]]; then
+			gdalwarp -t_srs EPSG:$srs $srcdst_nodata -r near $tmpdir/$acquisition_date/mosaic_crop_${term}_$product.$acquisition_date.tif $tmpdir/$acquisition_date/mosaic_crop_${term}_$product.$acquisition_date.tif.reproject
+			# overwrite - keep that old filename
+			mv $tmpdir/$acquisition_date/mosaic_crop_${term}_$product.$acquisition_date.tif.reproject $tmpdir/$acquisition_date/mosaic_crop_${term}_$product.$acquisition_date.tif
+		fi
+		# remove tmp files
+		rm $tmpdir/$acquisition_date/crop*
+		rm $tmpdir/$acquisition_date/${term}*
+		# better file names
+		rename "s:/mosaic_crop_:/:g" $tmpdir/$acquisition_date/*
+	done
 }
+export -f clip_mosaic_reproject
 
 function filter_QC {
 	# 1. use GDAL to make ASCII grid to find unique non-null values in the quality layer
@@ -310,9 +311,10 @@ function filter_QC {
 
 	qc_layer=$1
 	data_layer=$2
+	acquisitiondir=$3
 	
 	# get the clipped, mosaicked subsets as ASCII grid
-	find $outdir -type f -iregex ".*A[0-9]+.*$qc_layer*[.]tif$" |\
+	find $acquisitiondir -type f -iregex ".*A[0-9]+.*$qc_layer*[.]tif$" |\
 	# note that it might be inefficient to check QC flags by date when they could all be checked at once
 	# however, on larger datasets it might also break sort, uniq, etc to ask them to process all the ASCII grids at once
 	parallel --gnu '
@@ -372,7 +374,20 @@ function filter_QC {
 		mv $( dirname {} )/masked_$( basename ${tomask} ) $( dirname {} )/$( basename ${tomask} )
 	'
 }
+export -f filter_QC
 
-download
-clip_mosaic_reproject
-filter_QC $qc_layers
+# get the list of HDF to download
+# for each one, download, subset, clip, mosaic, reproject, QC filter
+download_list | parallel --gnu '
+	# remove if necessary and recreate acquisiton date dir
+	acquisition_date_dir=$( echo $( basename {} ) | grep -oE "[.]A[0-9]+[.]" | sed "s:[.]::g" )
+	mkdir '$tmpdir'/$acquisition_date_dir 2>/dev/null
+	download {} '$tmpdir'/$acquisition_date_dir
+	# for each acquisiton date, make a directory, extract the NDVI and quality subsets, clip each dates subsets to the intersection of its tile BBOX and the user shp, mosaic these
+	echo YOYOYOYOYO
+	echo clip_mosaic_reproject '$tmpdir'/$acquisition_date_dir/
+	echo filter_QC '$qc_layers' '$tmpdir'/$acquisition_date_dir
+	echo YOYOYOYOYO
+	clip_mosaic_reproject '$tmpdir'/$acquisition_date_dir/
+	filter_QC '$qc_layers' '$tmpdir'/$acquisition_date_dir
+'
