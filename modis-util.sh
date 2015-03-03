@@ -95,9 +95,6 @@ do
      esac
 done
 
-# TODO undo!
-tmpdir=/tmp/tmp.wCqHc7gqqW
-
 function numericdates {
 	# checks if YYYY-MM-DD USGS directories are within user specified date range
 	# used by download function to check relevant directories faster
@@ -172,8 +169,8 @@ function download_list {
 		echo "$tiles" |\
 		# isolate tile position in parens
 		sed 's:^:(:g;s:$:):g' |\
-		# tack on requirement that the file be hdf
-		sed 's:$:.*[.]hdf$:g'
+		# tack on regex requirement that the file be hdf or xml
+		sed 's:$:.*[.](hdf|xml)$:g'
 	)
 	# the base URL - this may change!
 	# note that $product is the name of the user selected product, eg MOD13A2.005
@@ -237,11 +234,6 @@ function clip_mosaic_reproject {
 	# clipping each subset by each tile before mosaicking (instead of mosaicking all and clipping by boundary after) takes more steps but is more memory efficient (unless whole tiles are desired - ought to create an alternative using a text file of tile lists)
 	# respects input nodata of the subset
 	acquisition_date=$1
-	###################
-###########################
-#########################
-#########################
-#### how to get getopts flags recognized inside functions inside gnu parallel
 	for term in $subdataset_terms
 	do
 		# find HDF that match the acquisition date dir
@@ -379,15 +371,22 @@ export -f filter_QC
 # get the list of HDF to download
 # for each one, download, subset, clip, mosaic, reproject, QC filter
 download_list | parallel --gnu '
-	# remove if necessary and recreate acquisiton date dir
+	# create acquisiton date dir
 	acquisition_date_dir=$( echo $( basename {} ) | grep -oE "[.]A[0-9]+[.]" | sed "s:[.]::g" )
 	mkdir '$tmpdir'/$acquisition_date_dir 2>/dev/null
+	# download the hdf and xml
 	download {} '$tmpdir'/$acquisition_date_dir
-	# for each acquisiton date, make a directory, extract the NDVI and quality subsets, clip each dates subsets to the intersection of its tile BBOX and the user shp, mosaic these
-	echo YOYOYOYOYO
-	echo clip_mosaic_reproject '$tmpdir'/$acquisition_date_dir/
-	echo filter_QC '$qc_layers' '$tmpdir'/$acquisition_date_dir
-	echo YOYOYOYOYO
-	clip_mosaic_reproject '$tmpdir'/$acquisition_date_dir/
-	filter_QC '$qc_layers' '$tmpdir'/$acquisition_date_dir
+	# process the file only if it is HDF
+	ext=$( echo {} | grep -oE "[^.]*$" )
+	if [[ $ext == "hdf" ]]; then
+		# for each acquisiton date, make a directory, extract the NDVI and quality subsets, clip each dates subsets to the intersection of its tile BBOX and the user shp, mosaic these
+		# must do this for GNU parallel to recognize the variable inside the function
+		subdataset_terms="'$subdataset_terms'"
+		echo YOYOYOYOYO
+		echo clip_mosaic_reproject '$tmpdir'/$acquisition_date_dir/
+		#filter_QC '$qc_layers' '$tmpdir'/$acquisition_date_dir
+		echo YOYOYOYOYO
+		clip_mosaic_reproject '$tmpdir'/$acquisition_date_dir/
+		#filter_QC '$qc_layers' '$tmpdir'/$acquisition_date_dir
+	fi
 '
