@@ -87,8 +87,6 @@ do
 	     mkdir $outdir 2>/dev/null
 	     #tmpdir to be moved to outdir at end
 	     tmpdir=$(mktemp -d)
-	     # TODO 
-	     tmpdir=/tmp/tmp.SkfAn2fVmZ
              ;;
          ?)
              usage
@@ -245,12 +243,12 @@ function clip_mosaic_reproject {
 		# extract the subsets for that date and term and move them to the date dir
 		while read hdf
 		do
-			subdataset $hdf $term $tmpdir/$acquisition_date
+			subdataset $hdf $term $acquisition_date_dir
 		done
 		# establish nodata value for this subset
 		# will be used by subsequent GDAL utils
 		example_file=$( 
-			find $tmpdir/$acquisition_date -type f -iregex ".*/${term}.*[.]tif$" |\
+			find $acquisition_date_dir -type f -iregex ".*/${term}.*[.]tif$" |\
 			sed -n "1p" 
 		) 
 		# TODO: this works for GDAL responses including "NoData Value" and "NUMFILL" - but what about others?
@@ -272,7 +270,7 @@ function clip_mosaic_reproject {
 			srcdst_nodata=""
 			merge_nodata=""
 		fi
-		find $tmpdir/$acquisition_date -type f -iregex ".*/${term}.*[.]tif$" |\
+		find $acquisition_date_dir -type f -iregex ".*/${term}.*[.]tif$" |\
 		# for each extracted subset of the date and term, crop to user boundary
 		while read to_crop
 		do
@@ -280,20 +278,20 @@ function clip_mosaic_reproject {
 			gdalwarp $srcdst_nodata -r near -cutline $boundary -crop_to_cutline -of GTiff -co COMPRESS=DEFLATE $to_crop $(echo $to_crop | sed "s:\(${term}_\):crop_\1:g")
 		done
 		# mosaic the output crops
-		gdal_merge.py $merge_nodata -of GTiff -co COMPRESS=DEFLATE -o $tmpdir/$acquisition_date/mosaic_crop_${term}_$product.$acquisition_date.tif $tmpdir/$acquisition_date/crop_${term}*
+		gdal_merge.py $merge_nodata -of GTiff -co COMPRESS=DEFLATE -o $acquisition_date_dir/mosaic_crop_${term}_$product.$acquisition_date.tif $acquisition_date_dir/crop_${term}*
 		# reproject if user raised flag
 		# as ridiculous as this seems, it is needed in case the -s flag is not raised. that, or flip the if condition
 		srs=$srs
 		if [[ -n $srs ]]; then
-			gdalwarp -t_srs EPSG:$srs $srcdst_nodata -r near $tmpdir/$acquisition_date/mosaic_crop_${term}_$product.$acquisition_date.tif $tmpdir/$acquisition_date/mosaic_crop_${term}_$product.$acquisition_date.tif.reproject
+			gdalwarp -t_srs EPSG:$srs $srcdst_nodata -r near $acquisition_date_dir/mosaic_crop_${term}_$product.$acquisition_date.tif $acquisition_date_dir/mosaic_crop_${term}_$product.$acquisition_date.tif.reproject
 			# overwrite - keep that old filename
-			mv $tmpdir/$acquisition_date/mosaic_crop_${term}_$product.$acquisition_date.tif.reproject $tmpdir/$acquisition_date/mosaic_crop_${term}_$product.$acquisition_date.tif
+			mv $acquisition_date_dir/mosaic_crop_${term}_$product.$acquisition_date.tif.reproject $acquisition_date_dir/mosaic_crop_${term}_$product.$acquisition_date.tif
 		fi
 		# remove tmp files
-		rm $tmpdir/$acquisition_date/crop*
-		rm $tmpdir/$acquisition_date/${term}*
+		rm $acquisition_date_dir/crop*
+		rm $acquisition_date_dir/${term}*
 		# better file names
-		rename "s:/mosaic_crop_:/:g" $tmpdir/$acquisition_date/*
+		rename "s:/mosaic_crop_:/:g" $acquisition_date_dir/*
 	done
 }
 export -f clip_mosaic_reproject
