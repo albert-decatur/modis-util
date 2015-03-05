@@ -276,20 +276,15 @@ function mosaic_reproject {
 	acquisition_date_dir=$1
 	term=$2
 	# mosaic the output crops
-	gdal_merge.py $merge_nodata -of GTiff -co COMPRESS=DEFLATE -o $acquisition_date_dir/mosaic_crop_${term}_$product.$acquisition_date.tif $acquisition_date_dir/crop_${term}*
+	gdal_merge.py $merge_nodata -of GTiff -co COMPRESS=DEFLATE -o $acquisition_date_dir/mosaic_crop_${term}_$product.$acquisition_date.tif $acquisition_date_dir/crop_${term}*.tif
 	# reproject if user raised flag
 	# as ridiculous as this seems, it is needed in case the -s flag is not raised. that, or flip the if condition
-#	srs=$srs
-#	if [[ -n $srs ]]; then
-#		gdalwarp -t_srs EPSG:$srs $srcdst_nodata -r near $acquisition_date_dir/mosaic_crop_${term}_$product.$acquisition_date.tif $acquisition_date_dir/mosaic_crop_${term}_$product.$acquisition_date.tif.reproject
-#		# overwrite - keep that old filename
-#		mv $acquisition_date_dir/mosaic_crop_${term}_$product.$acquisition_date.tif.reproject $acquisition_date_dir/mosaic_crop_${term}_$product.$acquisition_date.tif
-#	fi
-	# remove tmp files
-	###rm $acquisition_date_dir/crop*
-	###rm $acquisition_date_dir/${term}*
-	# better file names
-	###rename "s:/mosaic_crop_:/:g" $acquisition_date_dir/*
+	srs=$srs
+	if [[ -n $srs ]]; then
+		gdalwarp -t_srs EPSG:$srs $srcdst_nodata -r near $acquisition_date_dir/mosaic_crop_${term}_$product.$acquisition_date.tif $acquisition_date_dir/mosaic_crop_${term}_$product.$acquisition_date.tif.reproject
+		# overwrite - keep that old filename
+		mv $acquisition_date_dir/mosaic_crop_${term}_$product.$acquisition_date.tif.reproject $acquisition_date_dir/mosaic_crop_${term}_$product.$acquisition_date.tif
+	fi
 }
 export -f mosaic_reproject
 
@@ -406,12 +401,21 @@ parallel --gnu '
 				# NB: this must not have a trailing forward slash
 				clip $acquisition_date_dir $acquisition_date_dir/${term}_$( basename $to_download hdf)*tif
 				# TODO: if all of the HDFs subsets have been clipped, then mosaic their layer subset clips
-				find $acquisition_date_dir -type f -iregex ".*${term}_$( basename $to_download hdf)*[.]tif"
-				#mosaic_reproject $acquisition_date_dir $term
+				to_find=$( basename $( echo "$to_download" ) | sed "s:^\($( echo "$product" | grep -oE "^[^.]*" )[.]A[0-9]\+\)[.].*:\1.*[.]tif$:g;s:^:crop_${term}_:g;s:^:.*:g" )
+				to_mosaic=$( find $acquisition_date_dir -type f -iregex "$to_find" )
+				if [[ $( echo "$to_mosaic" | wc -l ) -eq 2 ]]; then
+					mosaic_reproject $acquisition_date_dir $term
+				fi
 			done
 		else
 			# just download - xml
 			download $to_download $acquisition_date_dir
 		fi
 	done
+# mosaic is correct but does not remove at the right time
+#	# remove tmp files
+#	rm $acquisition_date_dir/crop*
+#	rm $acquisition_date_dir/${term}*
+#	# better file names
+#	rename "s:/mosaic_crop_:/:g" $acquisition_date_dir/*
 '
