@@ -85,7 +85,6 @@ do
          o)
              outdir=$OPTARG
 	     mkdir $outdir 2>/dev/null
-	     outdir=/tmp/tmp.q9dB55gLN6
              ;;
          ?)
              usage
@@ -274,21 +273,23 @@ function clip {
 export -f clip
 
 function mosaic_reproject {
+	acquisition_date_dir=$1
+	term=$2
 	# mosaic the output crops
 	gdal_merge.py $merge_nodata -of GTiff -co COMPRESS=DEFLATE -o $acquisition_date_dir/mosaic_crop_${term}_$product.$acquisition_date.tif $acquisition_date_dir/crop_${term}*
 	# reproject if user raised flag
 	# as ridiculous as this seems, it is needed in case the -s flag is not raised. that, or flip the if condition
-	srs=$srs
-	if [[ -n $srs ]]; then
-		gdalwarp -t_srs EPSG:$srs $srcdst_nodata -r near $acquisition_date_dir/mosaic_crop_${term}_$product.$acquisition_date.tif $acquisition_date_dir/mosaic_crop_${term}_$product.$acquisition_date.tif.reproject
-		# overwrite - keep that old filename
-		mv $acquisition_date_dir/mosaic_crop_${term}_$product.$acquisition_date.tif.reproject $acquisition_date_dir/mosaic_crop_${term}_$product.$acquisition_date.tif
-	fi
+#	srs=$srs
+#	if [[ -n $srs ]]; then
+#		gdalwarp -t_srs EPSG:$srs $srcdst_nodata -r near $acquisition_date_dir/mosaic_crop_${term}_$product.$acquisition_date.tif $acquisition_date_dir/mosaic_crop_${term}_$product.$acquisition_date.tif.reproject
+#		# overwrite - keep that old filename
+#		mv $acquisition_date_dir/mosaic_crop_${term}_$product.$acquisition_date.tif.reproject $acquisition_date_dir/mosaic_crop_${term}_$product.$acquisition_date.tif
+#	fi
 	# remove tmp files
-	rm $acquisition_date_dir/crop*
-	rm $acquisition_date_dir/${term}*
+	###rm $acquisition_date_dir/crop*
+	###rm $acquisition_date_dir/${term}*
 	# better file names
-	rename "s:/mosaic_crop_:/:g" $acquisition_date_dir/*
+	###rename "s:/mosaic_crop_:/:g" $acquisition_date_dir/*
 }
 export -f mosaic_reproject
 
@@ -403,7 +404,9 @@ parallel --gnu '
 				subdataset $acquisition_date_dir/$hdf $term $acquisition_date_dir
 				find_nodata $acquisition_date_dir $term
 				# NB: this must not have a trailing forward slash
-				clip $acquisition_date_dir $acquisition_date_dir/*${term}*tif
+				clip $acquisition_date_dir $acquisition_date_dir/${term}_$( basename $to_download hdf)*tif
+				# TODO: if all of the HDFs subsets have been clipped, then mosaic their layer subset clips
+				mosaic_reproject $acquisition_date_dir $term
 			done
 		else
 			# just download - xml
