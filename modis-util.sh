@@ -406,7 +406,8 @@ parallel --gnu '
 				# NB: this must not have a trailing forward slash
 				clip $acquisition_date_dir $acquisition_date_dir/${term}_$( basename $to_download hdf)*tif
 				# TODO: if all of the HDFs subsets have been clipped, then mosaic their layer subset clips
-				mosaic_reproject $acquisition_date_dir $term
+				find $acquisition_date_dir -type f -iregex ".*${term}_$( basename $to_download hdf)*[.]tif"
+				#mosaic_reproject $acquisition_date_dir $term
 			done
 		else
 			# just download - xml
