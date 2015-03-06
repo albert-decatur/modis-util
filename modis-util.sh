@@ -403,19 +403,25 @@ parallel --gnu '
 				# TODO: if all of the HDFs subsets have been clipped, then mosaic their layer subset clips
 				to_find=$( basename $( echo "$to_download" ) | sed "s:^\($( echo "$product" | grep -oE "^[^.]*" )[.]A[0-9]\+\)[.].*:\1.*[.]tif$:g;s:^:crop_${term}_:g;s:^:.*:g" )
 				to_mosaic=$( find $acquisition_date_dir -type f -iregex "$to_find" )
+				# TODO: find out number of tiles
 				if [[ $( echo "$to_mosaic" | wc -l ) -eq 2 ]]; then
 					mosaic_reproject $acquisition_date_dir $term
+					# mosaic is correct but does not remove at the right time
+						# remove tmp files
+						rm $acquisition_date_dir/crop_${term}*
+						rm $acquisition_date_dir/${term}_*
+						# better file names
+						rename "s:/mosaic_crop_:/:g" $acquisition_date_dir/mosaic_crop_${term}_*
 				fi
 			done
+			rm $acquisition_date_dir/$( basename $to_download )
 		else
+			# keep XML?
 			# just download - xml
-			download $to_download $acquisition_date_dir
+			#download $to_download $acquisition_date_dir
+			false
 		fi
 	done
-# mosaic is correct but does not remove at the right time
-#	# remove tmp files
-#	rm $acquisition_date_dir/crop*
-#	rm $acquisition_date_dir/${term}*
-#	# better file names
-#	rename "s:/mosaic_crop_:/:g" $acquisition_date_dir/*
 '
+# keep the list of downloaded files
+mv $tmpdownloadlist $outdir/urls.txt
