@@ -81,6 +81,8 @@ do
              ;;
          q)
              qc_regex=$OPTARG
+	     # escape QC regex parens and pipes for GNU parallel
+             qc_regex_escaped=$( echo "$qc_regex" | sed 's:\((\|)\||\):\\\1:g' )
              ;;
          o)
              outdir=$OPTARG
@@ -272,11 +274,17 @@ function clip {
 }
 export -f clip
 
-function mosaic_reproject {
+function mosaic {
 	acquisition_date_dir=$1
 	term=$2
 	# mosaic the output crops
 	gdal_merge.py $merge_nodata -of GTiff -co COMPRESS=DEFLATE -o $acquisition_date_dir/mosaic_crop_${term}_$product.$acquisition_date.tif $acquisition_date_dir/crop_${term}*.tif
+}
+export -f mosaic
+
+function reproject {
+	acquisition_date_dir=$1
+	term=$2
 	# reproject if user raised flag
 	# as ridiculous as this seems, it is needed in case the -s flag is not raised. that, or flip the if condition
 	srs=$srs
@@ -286,7 +294,7 @@ function mosaic_reproject {
 		mv $acquisition_date_dir/mosaic_crop_${term}_$product.$acquisition_date.tif.reproject $acquisition_date_dir/mosaic_crop_${term}_$product.$acquisition_date.tif
 	fi
 }
-export -f mosaic_reproject
+export -f reproject
 
 function filter_QC {
 	# 1. use GDAL to make ASCII grid to find unique non-null values in the quality layer
@@ -381,6 +389,8 @@ parallel --gnu '
 	boundary="'$boundary'"
 	srs="'$srs'"
 	tmpdownloadlist='$tmpdownloadlist'
+	qc_layers="'$qc_layers'"
+	qc_regex_escaped_='$qc_regex_escaped'
 	# create acquisiton date dir
 	acquisition_date_dir=$( echo {} | sed "s:^:${outdir}/:g" )
 	mkdir $acquisition_date_dir 2>/dev/null
@@ -405,7 +415,8 @@ parallel --gnu '
 				to_mosaic=$( find $acquisition_date_dir -type f -iregex "$to_find" )
 				# TODO: find out number of tiles
 				if [[ $( echo "$to_mosaic" | wc -l ) -eq 2 ]]; then
-					mosaic_reproject $acquisition_date_dir $term
+					mosaic $acquisition_date_dir $term
+					reproject $acquisition_date_dir $term
 					# mosaic is correct but does not remove at the right time
 						# remove tmp files
 						rm $acquisition_date_dir/crop_${term}*
@@ -414,6 +425,11 @@ parallel --gnu '
 						rename "s:/mosaic_crop_:/:g" $acquisition_date_dir/mosaic_crop_${term}_*
 				fi
 			done
+			# QC flag handling
+			
+			# remove HDF - this way we can process more inputs than we have harddrive space
+			# remember that we are keeping the URLs
+			# TODO: make this a flag
 			rm $acquisition_date_dir/$( basename $to_download )
 		else
 			# keep XML?
