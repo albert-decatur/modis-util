@@ -435,11 +435,10 @@ parallel --gnu --bf $tmpdownloadlist --bf /tmp/functions --wd ... -S :,adecatur@
 					mosaic $acquisition_date_dir $term
 					reproject $acquisition_date_dir $term
 						# remove tmp files
-						# TODO: rm these
-						#rm $acquisition_date_dir/crop_${term}*
-						#rm $acquisition_date_dir/${term}_*
+						rm $acquisition_date_dir/crop_${term}*
+						rm $acquisition_date_dir/${term}_*
 						# better file names
-						#rename "s:/mosaic_crop_:/:g" $acquisition_date_dir/mosaic_crop_${term}_*
+						rename "s:/mosaic_crop_:/:g" $acquisition_date_dir/mosaic_crop_${term}_*
 				fi
 			done
 			# QC flag handling
