@@ -197,6 +197,13 @@ function download_list {
 	sed "s:^:$( echo ${baseuri} | sed 's:\(/\|\:\):\\\1:g' ):g"
 }
 
+# write function definitions used by GNU parallel to file using HERE doc
+# these can be shared with remote hosts later with GNU parallel --bf
+# note use of escaping HERE doc limit string to output literal text
+# note the function download_list and the functions it depends on are defined before GNU parallel as they generate the input for parallel
+cat > /tmp/functions << \EOF
+
+
 function download {
 	# download the images of interest
 	# what if the list is too long for xargs? GNU parallel?
@@ -362,6 +369,7 @@ function filter_QC {
 	mv $( dirname $qc_layer )/masked_$( basename $data_layer ) $( dirname $qc_layer )/$( basename $data_layer )
 }
 export -f filter_QC
+EOF
 
 # get the list of HDF to download
 download_list=$( download_list )
@@ -378,7 +386,12 @@ uniq |\
 # subset, clip
 # check to see if all HDF for a date have been downloaded,
 # if so mosaic, reproject, and QC filter
-parallel --gnu '
+# TODO: conditional on list of hosts
+parallel --gnu --bf $tmpdownloadlist --bf /tmp/functions --wd ... -S :,adecatur@grover.itpir.wm.edu '
+	# pick up function definitions
+	# we source this because of potential remote hosts
+	# GNU parallel --env did not work
+	source /tmp/functions
 	# must do this for GNU parallel to recognize the variable inside the function
 	# note: this may only be necessary for vars used in functions
 	outdir='$outdir'
@@ -386,7 +399,6 @@ parallel --gnu '
 	product="'$product'"
 	boundary="'$boundary'"
 	srs="'$srs'"
-	tmpdownloadlist='$tmpdownloadlist'
 	qc_layers="'$qc_layers'"
 	tmpqcregex='$tmpqcregex'
 	tmpdownloadlist='$tmpdownloadlist'
@@ -422,12 +434,12 @@ parallel --gnu '
 				if [[ $( echo "$to_mosaic" | wc -l ) -eq $tile_count ]]; then
 					mosaic $acquisition_date_dir $term
 					reproject $acquisition_date_dir $term
-					# mosaic is correct but does not remove at the right time
 						# remove tmp files
-						rm $acquisition_date_dir/crop_${term}*
-						rm $acquisition_date_dir/${term}_*
+						# TODO: rm these
+						#rm $acquisition_date_dir/crop_${term}*
+						#rm $acquisition_date_dir/${term}_*
 						# better file names
-						rename "s:/mosaic_crop_:/:g" $acquisition_date_dir/mosaic_crop_${term}_*
+						#rename "s:/mosaic_crop_:/:g" $acquisition_date_dir/mosaic_crop_${term}_*
 				fi
 			done
 			# QC flag handling
@@ -439,7 +451,7 @@ parallel --gnu '
 			fi
 			# remove HDF if user did not say to keep - this way we can process more inputs than we have harddrive space
 			# remember that we are keeping the URLs
-			# parallel needs this sillyness
+			# make sure to have a keep var at all
 			keep='$keep'
 			if [[ $keep != 1 ]]; then
 				rm $acquisition_date_dir/$( basename $to_download )
@@ -448,6 +460,7 @@ parallel --gnu '
 			download $to_download $acquisition_date_dir
 		fi
 	done
+	mv $acquisition_date_dir/ /tmp/
 '
 # keep the list of downloaded files
 mv $tmpdownloadlist $outdir/urls.txt
