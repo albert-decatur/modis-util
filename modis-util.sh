@@ -459,7 +459,9 @@ parallel --gnu --bf $tmpdownloadlist --bf /tmp/functions --wd ... -S :,adecatur@
 			download $to_download $acquisition_date_dir
 		fi
 	done
+	rm -r /tmp/$( echo $acquisition_date_dir | grep -oE "[^/]*$" )/
 	mv $acquisition_date_dir/ /tmp/
 '
 # keep the list of downloaded files
 mv $tmpdownloadlist $outdir/urls.txt
+# TODO: put acqusition date dirs back together under single out dir, no matter which host they come from
