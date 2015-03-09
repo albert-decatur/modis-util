@@ -8,7 +8,7 @@
 * mosaics
 * reprojects
 * filters by user defined quality control regular expression
-* parallel by default
+* parallel by default, including across hosts
 
 ### Example modis-util output
 
