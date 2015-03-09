@@ -1,0 +1,319 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE GranuleMetaDataFile SYSTEM "http://ecsinfo.gsfc.nasa.gov/ECSInfo/ecsmetadata/dtds/DPL/ECS/ScienceGranuleMetadata.dtd">
+<GranuleMetaDataFile>
+    <DTDVersion>1.0</DTDVersion>
+    <DataCenterId>EDC</DataCenterId>
+    <GranuleURMetaData>
+        <GranuleUR>SC:MOD13A2.005:2134565489</GranuleUR>
+        <DbID>2134565489</DbID>
+        <InsertTime>2014-10-24 04:54:03.609</InsertTime>
+        <LastUpdate>2014-10-25 02:12:13.013</LastUpdate>
+        <CollectionMetaData>
+            <ShortName>MOD13A2</ShortName>
+            <VersionID>5</VersionID>
+        </CollectionMetaData>
+        <DataFiles>
+            <DataFileContainer>
+                <DistributedFileName>MOD13A2.A2014273.h10v06.005.2014297054905.hdf</DistributedFileName>
+                <FileSize>5776277</FileSize>
+                <ChecksumType>CKSUM</ChecksumType>
+                <Checksum>3649258240</Checksum>
+                <ChecksumOrigin>DPLIngst</ChecksumOrigin>
+            </DataFileContainer>
+        </DataFiles>
+        <ECSDataGranule>
+            <SizeMBECSDataGranule>5.50869</SizeMBECSDataGranule>
+            <ReprocessingPlanned>further update is anticipated</ReprocessingPlanned>
+            <ReprocessingActual>reprocessed</ReprocessingActual>
+            <LocalGranuleID>MOD13A2.A2014273.h10v06.005.2014297054905.hdf</LocalGranuleID>
+            <DayNightFlag>Day</DayNightFlag>
+            <ProductionDateTime>2014-10-24 09:49:05.000</ProductionDateTime>
+            <LocalVersionID>5.2.2</LocalVersionID>
+        </ECSDataGranule>
+        <PGEVersionClass>
+            <PGEVersion>5.2.7</PGEVersion>
+        </PGEVersionClass>
+        <RangeDateTime>
+            <RangeEndingTime>23:59:59.000000</RangeEndingTime>
+            <RangeEndingDate>2014-10-15</RangeEndingDate>
+            <RangeBeginningTime>00:00:00.000000</RangeBeginningTime>
+            <RangeBeginningDate>2014-09-30</RangeBeginningDate>
+        </RangeDateTime>
+        <SpatialDomainContainer>
+            <HorizontalSpatialDomainContainer>
+                <GPolygon>
+                    <Boundary>
+                        <Point>
+                            <PointLongitude>-85.1199000270707</PointLongitude>
+                            <PointLatitude>19.8972839682412</PointLatitude>
+                        </Point>
+                        <Point>
+                            <PointLongitude>-92.3760430595367</PointLongitude>
+                            <PointLatitude>29.9999999973059</PointLatitude>
+                        </Point>
+                        <Point>
+                            <PointLongitude>-80.5352459184066</PointLongitude>
+                            <PointLatitude>30.0383760061888</PointLatitude>
+                        </Point>
+                        <Point>
+                            <PointLongitude>-74.2129537334706</PointLongitude>
+                            <PointLatitude>19.9339184091026</PointLatitude>
+                        </Point>
+                    </Boundary>
+                </GPolygon>
+            </HorizontalSpatialDomainContainer>
+        </SpatialDomainContainer>
+        <MeasuredParameter>
+            <MeasuredParameterContainer>
+                <ParameterName>1 km 16 days NDVI</ParameterName>
+                <QAStats>
+                    <QAPercentMissingData>0</QAPercentMissingData>
+                    <QAPercentOutofBoundsData>0</QAPercentOutofBoundsData>
+                    <QAPercentInterpolatedData>100</QAPercentInterpolatedData>
+                    <QAPercentCloudCover>1</QAPercentCloudCover>
+                </QAStats>
+                <QAFlags>
+                    <AutomaticQualityFlag>Passed</AutomaticQualityFlag>
+                    <AutomaticQualityFlagExplanation>No automatic quality assessment is performed in the PGE</AutomaticQualityFlagExplanation>
+                    <OperationalQualityFlag>Passed</OperationalQualityFlag>
+                    <OperationalQualityFlagExplanation>Passed</OperationalQualityFlagExplanation>
+                    <ScienceQualityFlag>Inferred Passed</ScienceQualityFlag>
+                    <ScienceQualityFlagExplanation>http://landweb.nascom.nasa.gov/cgi-bin/QA_WWW/detailInfo.cgi?prod_id=MOD13A2&amp;ver=C5.2014-10-25 02:12</ScienceQualityFlagExplanation>
+                </QAFlags>
+            </MeasuredParameterContainer>
+            <MeasuredParameterContainer>
+                <ParameterName>1 km 16 days EVI</ParameterName>
+                <QAStats>
+                    <QAPercentMissingData>0</QAPercentMissingData>
+                    <QAPercentOutofBoundsData>0</QAPercentOutofBoundsData>
+                    <QAPercentInterpolatedData>100</QAPercentInterpolatedData>
+                    <QAPercentCloudCover>1</QAPercentCloudCover>
+                </QAStats>
+                <QAFlags>
+                    <AutomaticQualityFlag>Passed</AutomaticQualityFlag>
+                    <AutomaticQualityFlagExplanation>No automatic quality assessment is performed in the PGE</AutomaticQualityFlagExplanation>
+                    <ScienceQualityFlag>Inferred Passed</ScienceQualityFlag>
+                    <ScienceQualityFlagExplanation>http://landweb.nascom.nasa.gov/cgi-bin/QA_WWW/detailInfo.cgi?prod_id=MOD13A2&amp;ver=C5.2014-10-25 02:12</ScienceQualityFlagExplanation>
+                </QAFlags>
+            </MeasuredParameterContainer>
+            <MeasuredParameterContainer>
+                <ParameterName>1 km 16 days VI Quality</ParameterName>
+                <QAStats>
+                    <QAPercentMissingData>0</QAPercentMissingData>
+                    <QAPercentOutofBoundsData>0</QAPercentOutofBoundsData>
+                    <QAPercentInterpolatedData>100</QAPercentInterpolatedData>
+                    <QAPercentCloudCover>1</QAPercentCloudCover>
+                </QAStats>
+                <QAFlags>
+                    <AutomaticQualityFlag>Passed</AutomaticQualityFlag>
+                    <AutomaticQualityFlagExplanation>No automatic quality assessment is performed in the PGE</AutomaticQualityFlagExplanation>
+                    <ScienceQualityFlag>Inferred Passed</ScienceQualityFlag>
+                    <ScienceQualityFlagExplanation>http://landweb.nascom.nasa.gov/cgi-bin/QA_WWW/detailInfo.cgi?prod_id=MOD13A2&amp;ver=C5.2014-10-25 02:12</ScienceQualityFlagExplanation>
+                </QAFlags>
+            </MeasuredParameterContainer>
+            <MeasuredParameterContainer>
+                <ParameterName>1 km 16 days red reflectance</ParameterName>
+                <QAStats>
+                    <QAPercentMissingData>0</QAPercentMissingData>
+                    <QAPercentOutofBoundsData>0</QAPercentOutofBoundsData>
+                    <QAPercentInterpolatedData>100</QAPercentInterpolatedData>
+                    <QAPercentCloudCover>1</QAPercentCloudCover>
+                </QAStats>
+                <QAFlags>
+                    <AutomaticQualityFlag>Passed</AutomaticQualityFlag>
+                    <AutomaticQualityFlagExplanation>No automatic quality assessment is performed in the PGE</AutomaticQualityFlagExplanation>
+                    <ScienceQualityFlag>Inferred Passed</ScienceQualityFlag>
+                    <ScienceQualityFlagExplanation>http://landweb.nascom.nasa.gov/cgi-bin/QA_WWW/detailInfo.cgi?prod_id=MOD13A2&amp;ver=C5.2014-10-25 02:12</ScienceQualityFlagExplanation>
+                </QAFlags>
+            </MeasuredParameterContainer>
+            <MeasuredParameterContainer>
+                <ParameterName>1 km 16 days NIR reflectance</ParameterName>
+                <QAStats>
+                    <QAPercentMissingData>0</QAPercentMissingData>
+                    <QAPercentOutofBoundsData>0</QAPercentOutofBoundsData>
+                    <QAPercentInterpolatedData>100</QAPercentInterpolatedData>
+                    <QAPercentCloudCover>1</QAPercentCloudCover>
+                </QAStats>
+                <QAFlags>
+                    <AutomaticQualityFlag>Passed</AutomaticQualityFlag>
+                    <AutomaticQualityFlagExplanation>No automatic quality assessment is performed in the PGE</AutomaticQualityFlagExplanation>
+                    <ScienceQualityFlag>Inferred Passed</ScienceQualityFlag>
+                    <ScienceQualityFlagExplanation>http://landweb.nascom.nasa.gov/cgi-bin/QA_WWW/detailInfo.cgi?prod_id=MOD13A2&amp;ver=C5.2014-10-25 02:12</ScienceQualityFlagExplanation>
+                </QAFlags>
+            </MeasuredParameterContainer>
+            <MeasuredParameterContainer>
+                <ParameterName>1 km 16 days blue reflectance</ParameterName>
+                <QAStats>
+                    <QAPercentMissingData>0</QAPercentMissingData>
+                    <QAPercentOutofBoundsData>0</QAPercentOutofBoundsData>
+                    <QAPercentInterpolatedData>100</QAPercentInterpolatedData>
+                    <QAPercentCloudCover>1</QAPercentCloudCover>
+                </QAStats>
+                <QAFlags>
+                    <AutomaticQualityFlag>Passed</AutomaticQualityFlag>
+                    <AutomaticQualityFlagExplanation>No automatic quality assessment is performed in the PGE</AutomaticQualityFlagExplanation>
+                    <ScienceQualityFlag>Inferred Passed</ScienceQualityFlag>
+                    <ScienceQualityFlagExplanation>http://landweb.nascom.nasa.gov/cgi-bin/QA_WWW/detailInfo.cgi?prod_id=MOD13A2&amp;ver=C5.2014-10-25 02:12</ScienceQualityFlagExplanation>
+                </QAFlags>
+            </MeasuredParameterContainer>
+            <MeasuredParameterContainer>
+                <ParameterName>1 km 16 days MIR reflectance</ParameterName>
+                <QAStats>
+                    <QAPercentMissingData>0</QAPercentMissingData>
+                    <QAPercentOutofBoundsData>0</QAPercentOutofBoundsData>
+                    <QAPercentInterpolatedData>100</QAPercentInterpolatedData>
+                    <QAPercentCloudCover>1</QAPercentCloudCover>
+                </QAStats>
+                <QAFlags>
+                    <AutomaticQualityFlag>Passed</AutomaticQualityFlag>
+                    <AutomaticQualityFlagExplanation>No automatic quality assessment is performed in the PGE</AutomaticQualityFlagExplanation>
+                    <ScienceQualityFlag>Inferred Passed</ScienceQualityFlag>
+                    <ScienceQualityFlagExplanation>http://landweb.nascom.nasa.gov/cgi-bin/QA_WWW/detailInfo.cgi?prod_id=MOD13A2&amp;ver=C5.2014-10-25 02:12</ScienceQualityFlagExplanation>
+                </QAFlags>
+            </MeasuredParameterContainer>
+            <MeasuredParameterContainer>
+                <ParameterName>1 km 16 days view zenith angle</ParameterName>
+                <QAStats>
+                    <QAPercentMissingData>0</QAPercentMissingData>
+                    <QAPercentOutofBoundsData>0</QAPercentOutofBoundsData>
+                    <QAPercentInterpolatedData>100</QAPercentInterpolatedData>
+                    <QAPercentCloudCover>1</QAPercentCloudCover>
+                </QAStats>
+                <QAFlags>
+                    <AutomaticQualityFlag>Passed</AutomaticQualityFlag>
+                    <AutomaticQualityFlagExplanation>No automatic quality assessment is performed in the PGE</AutomaticQualityFlagExplanation>
+                    <ScienceQualityFlag>Inferred Passed</ScienceQualityFlag>
+                    <ScienceQualityFlagExplanation>http://landweb.nascom.nasa.gov/cgi-bin/QA_WWW/detailInfo.cgi?prod_id=MOD13A2&amp;ver=C5.2014-10-25 02:12</ScienceQualityFlagExplanation>
+                </QAFlags>
+            </MeasuredParameterContainer>
+            <MeasuredParameterContainer>
+                <ParameterName>1 km 16 days sun zenith angle</ParameterName>
+                <QAStats>
+                    <QAPercentMissingData>0</QAPercentMissingData>
+                    <QAPercentOutofBoundsData>0</QAPercentOutofBoundsData>
+                    <QAPercentInterpolatedData>100</QAPercentInterpolatedData>
+                    <QAPercentCloudCover>1</QAPercentCloudCover>
+                </QAStats>
+                <QAFlags>
+                    <AutomaticQualityFlag>Passed</AutomaticQualityFlag>
+                    <AutomaticQualityFlagExplanation>No automatic quality assessment is performed in the PGE</AutomaticQualityFlagExplanation>
+                    <ScienceQualityFlag>Inferred Passed</ScienceQualityFlag>
+                    <ScienceQualityFlagExplanation>http://landweb.nascom.nasa.gov/cgi-bin/QA_WWW/detailInfo.cgi?prod_id=MOD13A2&amp;ver=C5.2014-10-25 02:12</ScienceQualityFlagExplanation>
+                </QAFlags>
+            </MeasuredParameterContainer>
+            <MeasuredParameterContainer>
+                <ParameterName>1 km 16 days relative azimuth angle</ParameterName>
+                <QAStats>
+                    <QAPercentMissingData>0</QAPercentMissingData>
+                    <QAPercentOutofBoundsData>0</QAPercentOutofBoundsData>
+                    <QAPercentInterpolatedData>100</QAPercentInterpolatedData>
+                    <QAPercentCloudCover>1</QAPercentCloudCover>
+                </QAStats>
+                <QAFlags>
+                    <AutomaticQualityFlag>Passed</AutomaticQualityFlag>
+                    <AutomaticQualityFlagExplanation>No automatic quality assessment is performed in the PGE</AutomaticQualityFlagExplanation>
+                    <ScienceQualityFlag>Inferred Passed</ScienceQualityFlag>
+                    <ScienceQualityFlagExplanation>http://landweb.nascom.nasa.gov/cgi-bin/QA_WWW/detailInfo.cgi?prod_id=MOD13A2&amp;ver=C5.2014-10-25 02:12</ScienceQualityFlagExplanation>
+                </QAFlags>
+            </MeasuredParameterContainer>
+            <MeasuredParameterContainer>
+                <ParameterName>1 km 16 days composite day of the year</ParameterName>
+                <QAStats>
+                    <QAPercentMissingData>0</QAPercentMissingData>
+                    <QAPercentOutofBoundsData>0</QAPercentOutofBoundsData>
+                    <QAPercentInterpolatedData>100</QAPercentInterpolatedData>
+                    <QAPercentCloudCover>1</QAPercentCloudCover>
+                </QAStats>
+                <QAFlags>
+                    <AutomaticQualityFlag>Passed</AutomaticQualityFlag>
+                    <AutomaticQualityFlagExplanation>No automatic quality assessment is performed in the PGE</AutomaticQualityFlagExplanation>
+                    <ScienceQualityFlag>Inferred Passed</ScienceQualityFlag>
+                    <ScienceQualityFlagExplanation>http://landweb.nascom.nasa.gov/cgi-bin/QA_WWW/detailInfo.cgi?prod_id=MOD13A2&amp;ver=C5.2014-10-25 02:12</ScienceQualityFlagExplanation>
+                </QAFlags>
+            </MeasuredParameterContainer>
+            <MeasuredParameterContainer>
+                <ParameterName>1 km 16 days pixel reliability</ParameterName>
+                <QAStats>
+                    <QAPercentMissingData>0</QAPercentMissingData>
+                    <QAPercentOutofBoundsData>0</QAPercentOutofBoundsData>
+                    <QAPercentInterpolatedData>100</QAPercentInterpolatedData>
+                    <QAPercentCloudCover>1</QAPercentCloudCover>
+                </QAStats>
+                <QAFlags>
+                    <AutomaticQualityFlag>Passed</AutomaticQualityFlag>
+                    <AutomaticQualityFlagExplanation>No automatic quality assessment is performed in the PGE</AutomaticQualityFlagExplanation>
+                    <ScienceQualityFlag>Inferred Passed</ScienceQualityFlag>
+                    <ScienceQualityFlagExplanation>http://landweb.nascom.nasa.gov/cgi-bin/QA_WWW/detailInfo.cgi?prod_id=MOD13A2&amp;ver=C5.2014-10-25 02:12</ScienceQualityFlagExplanation>
+                </QAFlags>
+            </MeasuredParameterContainer>
+        </MeasuredParameter>
+        <Platform>
+            <PlatformShortName>Terra</PlatformShortName>
+            <Instrument>
+                <InstrumentShortName>MODIS</InstrumentShortName>
+                <Sensor>
+                    <SensorShortName>MODIS</SensorShortName>
+                </Sensor>
+            </Instrument>
+        </Platform>
+        <PSAs>
+            <PSA>
+                <PSAName>QAPERCENTGOODQUALITY</PSAName>
+                <PSAValue>86</PSAValue>
+            </PSA>
+            <PSA>
+                <PSAName>QAPERCENTOTHERQUALITY</PSAName>
+                <PSAValue>14</PSAValue>
+            </PSA>
+            <PSA>
+                <PSAName>QAPERCENTNOTPRODUCEDCLOUD</PSAName>
+                <PSAValue>0</PSAValue>
+            </PSA>
+            <PSA>
+                <PSAName>QAPERCENTNOTPRODUCEDOTHER</PSAName>
+                <PSAValue>0</PSAValue>
+            </PSA>
+            <PSA>
+                <PSAName>NDVI1KM16DAYQCLASSPERCENTAGE</PSAName>
+                <PSAValue>0</PSAValue>
+            </PSA>
+            <PSA>
+                <PSAName>EVI1KM16DAYQCLASSPERCENTAGE</PSAName>
+                <PSAValue>0</PSAValue>
+            </PSA>
+            <PSA>
+                <PSAName>HORIZONTALTILENUMBER</PSAName>
+                <PSAValue>10</PSAValue>
+            </PSA>
+            <PSA>
+                <PSAName>VERTICALTILENUMBER</PSAName>
+                <PSAValue>06</PSAValue>
+            </PSA>
+            <PSA>
+                <PSAName>TileID</PSAName>
+                <PSAValue>51010006</PSAValue>
+            </PSA>
+        </PSAs>
+        <InputGranule>
+            <InputPointer>MODAGAGG.A2014273.h10v06.005.2014279013119.hdf</InputPointer>
+            <InputPointer>MODAGAGG.A2014274.h10v06.005.2014278225723.hdf</InputPointer>
+            <InputPointer>MODAGAGG.A2014275.h10v06.005.2014278221215.hdf</InputPointer>
+            <InputPointer>MODAGAGG.A2014276.h10v06.005.2014278011511.hdf</InputPointer>
+            <InputPointer>MODAGAGG.A2014277.h10v06.005.2014283015645.hdf</InputPointer>
+            <InputPointer>MODAGAGG.A2014278.h10v06.005.2014283050357.hdf</InputPointer>
+            <InputPointer>MODAGAGG.A2014279.h10v06.005.2014283060603.hdf</InputPointer>
+            <InputPointer>MODAGAGG.A2014280.h10v06.005.2014283181207.hdf</InputPointer>
+            <InputPointer>MODAGAGG.A2014281.h10v06.005.2014283174244.hdf</InputPointer>
+            <InputPointer>MODAGAGG.A2014282.h10v06.005.2014284022653.hdf</InputPointer>
+            <InputPointer>MODAGAGG.A2014283.h10v06.005.2014285024222.hdf</InputPointer>
+            <InputPointer>MODAGAGG.A2014284.h10v06.005.2014286020428.hdf</InputPointer>
+            <InputPointer>MODAGAGG.A2014285.h10v06.005.2014288150230.hdf</InputPointer>
+            <InputPointer>MODAGAGG.A2014286.h10v06.005.2014288141743.hdf</InputPointer>
+            <InputPointer>MODAGAGG.A2014287.h10v06.005.2014296111032.hdf</InputPointer>
+            <InputPointer>MODAGAGG.A2014288.h10v06.005.2014296114217.hdf</InputPointer>
+        </InputGranule>
+        <BrowseProduct>
+            <BrowseGranuleId>UR:10:DsShESDTUR:UR:15:DsShSciServerUR:13:[EDC:DSSDSRV]:24:BR:Browse.001:2134565642</BrowseGranuleId>
+        </BrowseProduct>
+    </GranuleURMetaData>
+</GranuleMetaDataFile>

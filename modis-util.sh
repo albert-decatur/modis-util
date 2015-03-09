@@ -48,10 +48,11 @@ OPTIONS:
            TODO: ability to filter more than one layer
    -o      output directory for mosaicked and clipped tifs - clips to boundary vector
 	   Note: the outpur directory will be made if necessary.  it ought to be empty
+   -k      use this flag to keep input HDF files
 EOF
 }
 
-while getopts "hb:t:p:d:s:o:x:q:l:" OPTION
+while getopts "hb:t:p:d:s:o:x:q:l:k" OPTION
 do
      case $OPTION in
          h)
@@ -71,7 +72,7 @@ do
              subdataset_terms=$OPTARG
              ;;
          d)
-             daterange=$OPTARG
+             daterange=($OPTARG)
              ;;
          s)
              srs=$OPTARG
@@ -81,12 +82,16 @@ do
              ;;
          q)
              qc_regex=$OPTARG
-	     # escape QC regex parens and pipes for GNU parallel
-             qc_regex_escaped=$( echo "$qc_regex" | sed 's:\((\|)\||\):\\\1:g' )
+	     # as a file for GNU parallel's sake
+	     tmpqcregex=$(mktemp)
+	     echo "$qc_regex" > $tmpqcregex
              ;;
          o)
              outdir=$OPTARG
 	     mkdir $outdir 2>/dev/null
+             ;;
+         k)
+             keep=1
              ;;
          ?)
              usage
@@ -99,19 +104,13 @@ function numericdates {
 	# checks if YYYY-MM-DD USGS directories are within user specified date range
 	# used by download function to check relevant directories faster
 	# these are referred to as numeric because they are ISO dates without the hypens
-	numericrange=$( 
-		echo "$daterange" |\
-		sed 's:-::g' |\
-		tr ' ' '\n' |\
-		sort -n
-	)
 	numericstart=$(	
-		echo "$numericrange" |\
-		sed -n '1p'
+		echo ${daterange[0]} |\
+		sed 's:-::g'
 	)
 	numericend=$(
-		echo "$numericrange" |\
-		sed -n '2p'
+		echo ${daterange[1]} |\
+		sed 's:-::g'
 	)
 }
 
@@ -119,7 +118,7 @@ function julianstartend {
 	# julian dates are used to ensure correct files are downloaded
 	# however, the USGS directory structure with ISO dates is relied on for speed
 	juliandays=$(
-		for date in $daterange
+		for date in $( echo ${daterange[*]} )
 		do
 			year=$(echo $date | grep -oE "^[0-9]{4}")
 			julianday=$( date -d "$date" +%j )
@@ -305,68 +304,66 @@ function filter_QC {
 
 	qc_layer=$1
 	data_layer=$2
-	acquisitiondir=$3
-	
+	qc_regex=$( cat $3 )
+	acquisition_date_dir=$4
+
 	# get the clipped, mosaicked subsets as ASCII grid
-	find $acquisitiondir -type f -iregex ".*A[0-9]+.*$qc_layer*[.]tif$" |\
 	# note that it might be inefficient to check QC flags by date when they could all be checked at once
 	# however, on larger datasets it might also break sort, uniq, etc to ask them to process all the ASCII grids at once
-	parallel --gnu '
-		tmpgrid=$(mktemp)
-		gdal_translate -of AAIGrid {} $tmpgrid
-		# find quality nodata value
-		nodata=$(
-			grep NODATA_value $tmpgrid |\
-			awk "{ print \$2 }"
-		)
-		# create a tmp file to hold blacklisted pixel values
-		tmpblacklist=$(mktemp)
-		cat $tmpgrid |\
-		# ignore header
-		sed "1,6d" |\
-		tr " " "\n" |\
-		grep -vE "^$" |\
-		# get unique pixel values
-		sort |\
-		uniq |\
-		# ignore nodata
-		grep -vE "$nodata" |\
-		# for each unique non-null pixel value, get the QC 16bits
-		while read bitpacked
-		do 
-			# pass the int to bc to get binary
-			echo "obase=2; $bitpacked" |\
-			bc |\
-			# now we need to pad with leading zeroes
-			# I have no idea why but the following does work for 16bit
-			# printf was not a solution!
-			# credit goes to Jonathan Leffler
-			# http://stackoverflow.com/questions/12633522/prevent-bc-from-auto-truncating-leading-zeros-when-converting-from-hex-to-binary
-			# pad binary with leading zeroes as needed to show 16 bits
-			awk "{ len = (8 - length % 8) % 8; printf \"%.*s%s\n\", len, \"00000000\", \$0}" |\
-			# show the bitpacked int as well for lookup later
-			sed "s:^:$bitpacked\t:g"
-		done |\
-		# use the user provided regex to find acceptable bitpacked int values in the QC maps
-		# note that QC field reads from right to left
-		# store them in a tmp blacklist
-		awk "{if(\$2 !~ /'$qc_regex'/)print \$1}" |\
-		tr "\n" "|" |\
-		sed "s:|$::g;s:|:\\\|:g" \
-		> $tmpblacklist
-		# convert this blacklist into nodata value in the ASCII grid
-		# TODO: temporarily ignore and then reattach header in case bad quality bitpacked ints appear in ASCII header
-		# just in case all pixels are acceptable, do not try to change anything!
-		if [[ $( cat $tmpblacklist | grep -vE "^$" | wc -l ) != 0 ]]; then
-			sed -i "s:\b\($( cat $tmpblacklist )\)\b:$nodata:g" $tmpgrid
-		fi
-		# for pixels where the masked grid is null, make your other layer null
-		# use of ls to pick up name of layer to mask is sloppy
-		tomask=$( ls $( dirname {} )/'${data_layer}'*.tif )
-		gdal_calc.py -A $tmpgrid -B $tomask --calc="B+1*(A==$nodata)" --outfile=$( dirname {} )/masked_$( basename ${tomask} )
-		# replace the old unmasked layer with the masked one
-		mv $( dirname {} )/masked_$( basename ${tomask} ) $( dirname {} )/$( basename ${tomask} )
-	'
+	tmpgrid=$(mktemp)
+	gdal_translate -of AAIGrid $qc_layer $tmpgrid
+	# find quality nodata value
+	nodata=$(
+		grep NODATA_value $tmpgrid |\
+		awk "{ print \$2 }"
+	)
+	# create a tmp file to hold blacklisted pixel values
+	tmpblacklist=$(mktemp)
+	cat $tmpgrid |\
+	# ignore header
+	sed "1,6d" |\
+	tr " " "\n" |\
+	grep -vE "^$" |\
+	# get unique pixel values
+	sort |\
+	uniq |\
+	# ignore nodata
+	grep -vE "$nodata" |\
+	# for each unique non-null pixel value, get the QC 16bits
+	while read bitpacked
+	do 
+		# pass the int to bc to get binary
+		echo "obase=2; $bitpacked" |\
+		bc |\
+		# now we need to pad with leading zeroes
+		# I have no idea why but the following does work for 16bit
+		# printf was not a solution!
+		# credit goes to Jonathan Leffler
+		# http://stackoverflow.com/questions/12633522/prevent-bc-from-auto-truncating-leading-zeros-when-converting-from-hex-to-binary
+		# pad binary with leading zeroes as needed to show 16 bits
+		awk "{ len = (8 - length % 8) % 8; printf \"%.*s%s\n\", len, \"00000000\", \$0}" |\
+		# show the bitpacked int as well for lookup later
+		sed "s:^:$bitpacked\t:g"
+	done |\
+	# use the user provided regex to find acceptable bitpacked int values in the QC maps
+	# note that QC field reads from right to left
+	# store them in a tmp blacklist
+	awk "{if(\$2 !~ /$qc_regex/)print \$1}" |\
+	tr "\n" "|" |\
+	sed "s:|$::g;s:|:\\\|:g" \
+	> $tmpblacklist
+	# convert this blacklist into nodata value in the ASCII grid
+	# TODO: temporarily ignore and then reattach header in case bad quality bitpacked ints appear in ASCII header
+	# just in case all pixels are acceptable, do not try to change anything!
+	# TODO: this if statement seems wrong
+	if [[ $( cat $tmpblacklist | grep -vE "^$" | wc -l ) != 0 ]]; then
+		sed -i "s:\b\($( cat $tmpblacklist )\)\b:$nodata:g" $tmpgrid
+	fi
+	# for pixels where the masked grid is null, make your other layer null
+	# use of ls to pick up name of layer to mask is sloppy
+	gdal_calc.py -A $tmpgrid -B $data_layer --calc="B+1*(A==$nodata)" --outfile=$( dirname $qc_layer )/masked_$( basename $data_layer )
+	# replace the old unmasked layer with the masked one
+	mv $( dirname $qc_layer )/masked_$( basename $data_layer ) $( dirname $qc_layer )/$( basename $data_layer )
 }
 export -f filter_QC
 
@@ -390,7 +387,7 @@ parallel --gnu '
 	srs="'$srs'"
 	tmpdownloadlist='$tmpdownloadlist'
 	qc_layers="'$qc_layers'"
-	qc_regex_escaped_='$qc_regex_escaped'
+	tmpqcregex='$tmpqcregex'
 	# create acquisiton date dir
 	acquisition_date_dir=$( echo {} | sed "s:^:${outdir}/:g" )
 	mkdir $acquisition_date_dir 2>/dev/null
@@ -410,7 +407,6 @@ parallel --gnu '
 				find_nodata $acquisition_date_dir $term
 				# NB: this must not have a trailing forward slash
 				clip $acquisition_date_dir $acquisition_date_dir/${term}_$( basename $to_download hdf)*tif
-				# TODO: if all of the HDFs subsets have been clipped, then mosaic their layer subset clips
 				to_find=$( basename $( echo "$to_download" ) | sed "s:^\($( echo "$product" | grep -oE "^[^.]*" )[.]A[0-9]\+\)[.].*:\1.*[.]tif$:g;s:^:crop_${term}_:g;s:^:.*:g" )
 				to_mosaic=$( find $acquisition_date_dir -type f -iregex "$to_find" )
 				# TODO: find out number of tiles
@@ -426,16 +422,25 @@ parallel --gnu '
 				fi
 			done
 			# QC flag handling
-			
-			# remove HDF - this way we can process more inputs than we have harddrive space
+			# turn this into a tiny function to only do once
+			# TODO: find out number of tiles
+			if [[ $( echo "$to_mosaic" | wc -l ) -eq 2 ]]; then
+				layers=($qc_layers)
+				qc_layer=$( find $acquisition_date_dir -type f -iregex ".*/${layers[0]}_.*[.]tif$" )
+				data_layer=$( find $acquisition_date_dir -type f -iregex ".*/${layers[1]}_.*[.]tif$" )
+				filter_QC $qc_layer $data_layer $tmpqcregex $acquisition_date_dir
+			fi
+			# remove HDF if user did not say to keep - this way we can process more inputs than we have harddrive space
 			# remember that we are keeping the URLs
-			# TODO: make this a flag
-			rm $acquisition_date_dir/$( basename $to_download )
+			# parallel needs this sillyness
+			keep='$keep'
+			if [[ $keep != 1 ]]; then
+				rm $acquisition_date_dir/$( basename $to_download )
+			fi
 		else
 			# keep XML?
 			# just download - xml
-			#download $to_download $acquisition_date_dir
-			false
+			download $to_download $acquisition_date_dir
 		fi
 	done
 '
