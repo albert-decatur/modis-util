@@ -8,6 +8,7 @@
 * mosaics
 * reprojects
 * filters by user defined quality control regular expression
+* parallel by default
 
 ### Example modis-util output
 
