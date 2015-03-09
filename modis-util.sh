@@ -445,8 +445,6 @@ parallel --gnu '
 				rm $acquisition_date_dir/$( basename $to_download )
 			fi
 		else
-			# keep XML?
-			# just download - xml
 			download $to_download $acquisition_date_dir
 		fi
 	done
