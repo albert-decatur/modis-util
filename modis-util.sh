@@ -6,9 +6,7 @@
 # 3. option to preview browse JPG before download
 # 4. if the output of masking according to user QC flag regex is all null then delete the acquisition date directory
 # 5. allow to filter by tiles with land or water or both
-# 6. have MODIS tiles from Neteler come prepackaged as SQLite db
-# 7. bring back XML downloads
-# 8. store URLs of downloads
+# 6. have MODIS tiles from Neteler come prepackaged as SQLite db (with attribute for whether they are land or water)
 
 # NB
 # GDAL 1.10 might have to be used so that gdal_merge.py has the -a_nodata flag available
@@ -40,7 +38,6 @@ OPTIONS:
            Note: these will be searched for in gdalinfo output on the downloaded HDFs.  they will also be used in output file names
            only one word per subset. (regex would be better)
    -s	   output spatial reference system as EPSG code. 
-	   TODO: not providing this option means no reprojection will occur.
    -q      QC flag regular expression. Should be quoted.
 	   Note: QC flags read from right to left.  also, this has only been tested on MOD13A2
    -l      layers to use for QC filtering - first is the QC layer, second is the layer to filter
@@ -355,7 +352,6 @@ function filter_QC {
 	# convert this blacklist into nodata value in the ASCII grid
 	# TODO: temporarily ignore and then reattach header in case bad quality bitpacked ints appear in ASCII header
 	# just in case all pixels are acceptable, do not try to change anything!
-	# TODO: this if statement seems wrong
 	if [[ $( cat $tmpblacklist | grep -vE "^$" | wc -l ) != 0 ]]; then
 		sed -i "s:\b\($( cat $tmpblacklist )\)\b:$nodata:g" $tmpgrid
 	fi
@@ -378,8 +374,13 @@ grep -oE "[.]A[0-9]{7}[.]" |\
 sed "s:[.]::g" |\
 sort |\
 uniq |\
+# for each acqusition date, download the HDF and XML
+# subset, clip
+# check to see if all HDF for a date have been downloaded,
+# if so mosaic, reproject, and QC filter
 parallel --gnu '
 	# must do this for GNU parallel to recognize the variable inside the function
+	# note: this may only be necessary for vars used in functions
 	outdir='$outdir'
 	subdataset_terms="'$subdataset_terms'"
 	product="'$product'"
@@ -388,6 +389,15 @@ parallel --gnu '
 	tmpdownloadlist='$tmpdownloadlist'
 	qc_layers="'$qc_layers'"
 	tmpqcregex='$tmpqcregex'
+	tmpdownloadlist='$tmpdownloadlist'
+	# determine how many HDF files (really tiles) there are for this acquisition date
+	# this will be needed for determining whether all HDF have been processed for a date and are ready to be mosaiced, reprojected, and QC filtered
+	tile_count=$(
+		cat $tmpdownloadlist |\
+		grep -vE "[.]xml$" |\
+		grep {} |\
+		wc -l
+	)
 	# create acquisiton date dir
 	acquisition_date_dir=$( echo {} | sed "s:^:${outdir}/:g" )
 	mkdir $acquisition_date_dir 2>/dev/null
@@ -409,8 +419,7 @@ parallel --gnu '
 				clip $acquisition_date_dir $acquisition_date_dir/${term}_$( basename $to_download hdf)*tif
 				to_find=$( basename $( echo "$to_download" ) | sed "s:^\($( echo "$product" | grep -oE "^[^.]*" )[.]A[0-9]\+\)[.].*:\1.*[.]tif$:g;s:^:crop_${term}_:g;s:^:.*:g" )
 				to_mosaic=$( find $acquisition_date_dir -type f -iregex "$to_find" )
-				# TODO: find out number of tiles
-				if [[ $( echo "$to_mosaic" | wc -l ) -eq 2 ]]; then
+				if [[ $( echo "$to_mosaic" | wc -l ) -eq $tile_count ]]; then
 					mosaic $acquisition_date_dir $term
 					reproject $acquisition_date_dir $term
 					# mosaic is correct but does not remove at the right time
@@ -422,9 +431,7 @@ parallel --gnu '
 				fi
 			done
 			# QC flag handling
-			# turn this into a tiny function to only do once
-			# TODO: find out number of tiles
-			if [[ $( echo "$to_mosaic" | wc -l ) -eq 2 ]]; then
+			if [[ $( echo "$to_mosaic" | wc -l ) -eq $tile_count ]]; then
 				layers=($qc_layers)
 				qc_layer=$( find $acquisition_date_dir -type f -iregex ".*/${layers[0]}_.*[.]tif$" )
 				data_layer=$( find $acquisition_date_dir -type f -iregex ".*/${layers[1]}_.*[.]tif$" )
