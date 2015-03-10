@@ -46,10 +46,11 @@ OPTIONS:
    -o      output directory for mosaicked and clipped tifs - clips to boundary vector
 	   Note: the outpur directory will be made if necessary.  it ought to be empty
    -k      use this flag to keep input HDF files
+   -S      comma separated list of hosts to run script on in parallel.  it is always assumed localhost is used
 EOF
 }
 
-while getopts "hb:t:p:d:s:o:x:q:l:k" OPTION
+while getopts "hb:t:p:d:s:o:x:q:l:kS:" OPTION
 do
      case $OPTION in
          h)
@@ -89,6 +90,12 @@ do
              ;;
          k)
              keep=1
+             ;;
+         S)
+             # note that hosts is defined as having a leading comma - this is because localhost is always assumed by the script, but GNU parallel needs a comma separated list
+	     if [[ -n $OPTARG ]]; then
+		     hosts=",$OPTARG"
+	     fi
              ;;
          ?)
              usage
@@ -271,6 +278,7 @@ export -f find_nodata
 function clip {
 	acquisition_date_dir=$1
 	to_crop=$2
+	boundary=$3
 	# for each extracted subset of the date and term, crop to user boundary
 	# cutline on user boundary
 	gdalwarp $srcdst_nodata -r near -cutline $boundary -crop_to_cutline -of GTiff -co COMPRESS=DEFLATE $to_crop $(echo $to_crop | sed "s:\(${term}_\):crop_\1:g")
@@ -376,6 +384,27 @@ download_list=$( download_list )
 # save URLs for parallel
 tmpdownloadlist=$(mktemp)
 echo "$download_list" > $tmpdownloadlist
+# transfer files once to remote hosts, instead of parallel --bf which was not working
+# always assume localhost is used
+for host in localhost $( echo $hosts | sed "s:,: :g" )
+do
+	if [[ $host == localhost ]]; then
+		# copy when localhost instead of rsync so ssh access to localhost is not needed
+		for i in $( echo $boundary | sed "s:[.]shp$::g" ).*
+		do 
+			ext=$( echo $i | grep -oE "[^.]*$" )
+			cp $i /tmp/boundary.${ext}
+		done
+	else
+		rsync /tmp/functions $tmpdownloadlist $tmpqcregex ${host}:/tmp/
+		# move boundary shp to /tmp/ so remote hosts will have same path
+		for i in $( echo $boundary | sed "s:[.]shp$::g" ).*
+		do 
+			ext=$( echo $i | grep -oE "[^.]*$" )
+			rsync $i ${host}:/tmp/boundary.${ext}
+		done
+	fi
+done
 # get the acquisition dates
 echo "$download_list" |\
 grep -oE "[.]A[0-9]{7}[.]" |\
@@ -386,8 +415,8 @@ uniq |\
 # subset, clip
 # check to see if all HDF for a date have been downloaded,
 # if so mosaic, reproject, and QC filter
-# TODO: conditional on list of hosts
-parallel --gnu --bf $tmpdownloadlist --bf /tmp/functions --wd ... -S : '
+# note: it is always assumed localhost is used (that is parallel's ":")
+parallel --gnu --wd ... -S :$hosts '
 	# pick up function definitions
 	# we source this because of potential remote hosts
 	# GNU parallel --env did not work
@@ -428,7 +457,7 @@ parallel --gnu --bf $tmpdownloadlist --bf /tmp/functions --wd ... -S : '
 				subdataset $acquisition_date_dir/$hdf $term $acquisition_date_dir
 				find_nodata $acquisition_date_dir $term
 				# NB: this must not have a trailing forward slash
-				clip $acquisition_date_dir $acquisition_date_dir/${term}_$( basename $to_download hdf)*tif
+				clip $acquisition_date_dir $acquisition_date_dir/${term}_$( basename $to_download hdf)*tif /tmp/boundary.shp
 				to_find=$( basename $( echo "$to_download" ) | sed "s:^\($( echo "$product" | grep -oE "^[^.]*" )[.]A[0-9]\+\)[.].*:\1.*[.]tif$:g;s:^:crop_${term}_:g;s:^:.*:g" )
 				to_mosaic=$( find $acquisition_date_dir -type f -iregex "$to_find" )
 				if [[ $( echo "$to_mosaic" | wc -l ) -eq $tile_count ]]; then
@@ -461,9 +490,12 @@ parallel --gnu --bf $tmpdownloadlist --bf /tmp/functions --wd ... -S : '
 	done
 	# move the acquisition date dir to tmp, just in case we are on remote host
 	# make sure there is no such directory there first
-	rm -r /tmp/$( echo $acquisition_date_dir | grep -oE "[^/]*$" )/
+	rm -r /tmp/$( echo $acquisition_date_dir | grep -oE "[^/]*$" )/ 2>/dev/null
 	mv $acquisition_date_dir/ /tmp/
+	# TODO copy dir back to localhost
+	# remote host will need ssh access to localhost
+	# that or get them all at the end
+
 '
 # keep the list of downloaded files
 mv $tmpdownloadlist $outdir/urls.txt
-# TODO: put acqusition date dirs back together under single out dir, no matter which host they come from
