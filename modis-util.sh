@@ -387,7 +387,7 @@ uniq |\
 # check to see if all HDF for a date have been downloaded,
 # if so mosaic, reproject, and QC filter
 # TODO: conditional on list of hosts
-parallel --gnu --bf $tmpdownloadlist --bf /tmp/functions --wd ... -S :,adecatur@grover.itpir.wm.edu '
+parallel --gnu --bf $tmpdownloadlist --bf /tmp/functions --wd ... -S : '
 	# pick up function definitions
 	# we source this because of potential remote hosts
 	# GNU parallel --env did not work
@@ -459,6 +459,8 @@ parallel --gnu --bf $tmpdownloadlist --bf /tmp/functions --wd ... -S :,adecatur@
 			download $to_download $acquisition_date_dir
 		fi
 	done
+	# move the acquisition date dir to tmp, just in case we are on remote host
+	# make sure there is no such directory there first
 	rm -r /tmp/$( echo $acquisition_date_dir | grep -oE "[^/]*$" )/
 	mv $acquisition_date_dir/ /tmp/
 '
