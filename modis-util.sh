@@ -373,6 +373,8 @@ function filter_QC {
 	# for pixels where the masked grid is null, make your other layer null
 	# use of ls to pick up name of layer to mask is sloppy
 	gdal_calc.py -A $tmpgrid -B $data_layer --calc="B+1*(A==$nodata)" --outfile=$( dirname $qc_layer )/masked_$( basename $data_layer )
+	# remove tmpgrid
+	rm $tmpgrid
 	# replace the old unmasked layer with the masked one
 	mv $( dirname $qc_layer )/masked_$( basename $data_layer ) $( dirname $qc_layer )/$( basename $data_layer )
 }
