@@ -1,1 +1,2 @@
-AL071853	UNNAMED	1853	09	28	12	00	15	-37	50	0
+id,name,year,month,day,hour,minute,lat,lon,max_sustained_wind_kts,sshws
+AL071853,UNNAMED,1853,09,28,12,00,15,-37,50,0
