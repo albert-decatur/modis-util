@@ -23,8 +23,31 @@
 
 Example execution time on a 1 CPU 2GB RAM machine (seriously minimal hardware!):
 
-  * 100 minutes for download
-  * 30 minutes for processing
+* 1 minute 30 seconds to process two dates for New Orleans NDVI
+
+Example was executed this way:
+
+```bash
+./modis-util.sh\
+-p MOD13A2.005\
+# get these bands from HDF inputs
+-x "ndvi quality"\
+# use tiles from this date range
+-d "2014-09-29 2014-10-30"\
+# reproject to WGS84
+-s 4326\
+# put outputs - organized by date - into output/ directory
+-o output/ \
+# use this regular expression for enforcing rules in quality band
+-q "(0000|0001|0010|0100|1000)(01|00)$"\
+# use quality band to enforce rules on ndvi band
+-l "quality ndvi"\
+# use this shapefile as the MODIS tile template
+-t input/modis_sinusoidal/modis_sinusoidal_grid_world.shp\
+# clip to New Orleans boundary before mosaicking
+-b input/boundary/NOLA/NOLA_Boundary.shp
+```
+
 
 ### Prerequisites
 
