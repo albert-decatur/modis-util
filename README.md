@@ -56,3 +56,5 @@ Example was executed this way:
 * GNU parallel
 * lftp
 * moreutils
+
+List of land tiles comes from [here](https://nsidc.org/data/docs/daac/mod10_modis_snow/sinusoidal_tile_coordinates.html).
