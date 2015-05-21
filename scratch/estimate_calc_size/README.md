@@ -5,3 +5,5 @@
 * for each storm
   * find count dates for each tile
   * sum pixels to process - this is all dates for all tiles involved
+
+NB: tiles can be selected that do not contain land that buffered hurricane points intersects IF that buffered hurricane point contains land in another tile
