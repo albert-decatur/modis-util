@@ -58,3 +58,4 @@ Example was executed this way:
 * moreutils
 
 List of land tiles comes from [here](https://nsidc.org/data/docs/daac/mod10_modis_snow/sinusoidal_tile_coordinates.html).
+Buffer distance was decided to be 150 miles due to this source: http://www.unidata.ucar.edu/data/NGCS/lobjects/chp/structure/
