@@ -1,0 +1,9 @@
+<OGRVRTDataSource>                                                              
+        <OGRVRTLayer name="AL072004">                                             
+                <SrcDataSource>/home/adecatur/git/modis-util/scratch/GHCN/ghcn_landfallEvent_awnd/AL072004.csv</SrcDataSource>                       
+                <SrcLayer>AL072004</SrcLayer>                                     
+                <GeometryType>wkbPoint</GeometryType>                           
+                <LayerSRS>WGS84</LayerSRS>                                      
+                <GeometryField encoding="PointFromColumns" x="lng" y="lat" />
+        </OGRVRTLayer>                                                          
+</OGRVRTDataSource>
